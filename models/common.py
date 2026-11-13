@@ -48,8 +48,9 @@ class EqualizedLinear(nn.Module):
         self.out_features = out_features
         self.lr_mul = lr_mul
 
-        # Initialize weights ~ N(0, 1) as required by runtime He scaling
-        self.weight = nn.Parameter(torch.randn(out_features, in_features))
+        # Initialize weights ~ N(0, 1) divided by lr_mul so that runtime scaling
+        # (scale * weight) preserves unit forward variance across multiple layers
+        self.weight = nn.Parameter(torch.randn(out_features, in_features) / lr_mul)
         if bias:
             self.bias = nn.Parameter(torch.zeros(out_features))
         else:
@@ -85,7 +86,7 @@ class EqualizedConv2d(nn.Module):
         self.lr_mul = lr_mul
 
         self.weight = nn.Parameter(
-            torch.randn(out_channels, in_channels, kernel_size, kernel_size)
+            torch.randn(out_channels, in_channels, kernel_size, kernel_size) / lr_mul
         )
         if bias:
             self.bias = nn.Parameter(torch.zeros(out_channels))

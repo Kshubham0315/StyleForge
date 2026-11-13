@@ -323,7 +323,7 @@ class StyleGenerator(nn.Module):
             styles = w.unsqueeze(1).repeat(1, self.num_style_layers, 1)  # (B, L, D)
 
         # Truncation trick: w' = w_avg + psi * (w - w_avg)
-        if truncation_psi < 1.0:
+        if truncation_psi < 1.0 and not torch.all(self.w_avg == 0):
             cutoff = truncation_cutoff if truncation_cutoff is not None else self.num_style_layers
             w_avg_expanded = self.w_avg.view(1, 1, -1)
             styles[:, :cutoff, :] = w_avg_expanded + truncation_psi * (styles[:, :cutoff, :] - w_avg_expanded)
@@ -348,7 +348,7 @@ class StyleGenerator(nn.Module):
         else:
             styles = w.clone()
 
-        if truncation_psi < 1.0:
+        if truncation_psi < 1.0 and not torch.all(self.w_avg == 0):
             cutoff = truncation_cutoff if truncation_cutoff is not None else self.num_style_layers
             w_avg_expanded = self.w_avg.view(1, 1, -1)
             styles[:, :cutoff, :] = w_avg_expanded + truncation_psi * (styles[:, :cutoff, :] - w_avg_expanded)

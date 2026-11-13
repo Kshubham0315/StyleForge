@@ -40,7 +40,7 @@
     "sample_every": 25,
     "checkpoint_every": 50
   },
-  "git_commit": "9ca3d51d11360b8d1b036d78940b11911513ea31",
+  "git_commit": "de4150970c6e0804887ad812cf1721c2e7e74736",
   "device": "cuda",
   "gpu_name": "NVIDIA GeForce RTX 4050 Laptop GPU"
 }
