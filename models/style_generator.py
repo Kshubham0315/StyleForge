@@ -109,14 +109,14 @@ class SynthesisNetwork(nn.Module):
         self.img_size = img_size
         self.use_attention = use_attention
 
-        # Channel schedule: 4x4 (512), 8x8 (512), 16x16 (256), 32x32 (128), 64x64 (64), 128x128 (32)
+        # Dynamic channel map with min channel clamp
         channel_map = {
             4: base_channels,
             8: base_channels,
-            16: min(max_channels, base_channels // 2),
-            32: min(max_channels, base_channels // 4),
-            64: min(max_channels, base_channels // 8),
-            128: min(max_channels, base_channels // 16),
+            16: max(16, min(max_channels, base_channels // 2)),
+            32: max(16, min(max_channels, base_channels // 4)),
+            64: max(16, min(max_channels, base_channels // 8)),
+            128: max(16, min(max_channels, base_channels // 16)),
         }
 
         # Learned constant 4x4 input
@@ -128,10 +128,12 @@ class SynthesisNetwork(nn.Module):
         self.initial_adain = AdaIN(style_dim, self.const_channels)
         self.initial_block = StyleBlock(self.const_channels, self.const_channels, style_dim)
 
-        # Multi-scale blocks: 8x8, 16x16, 32x32, 64x64, (128x128)
-        self.resolutions = [8, 16, 32, 64]
-        if img_size == 128:
-            self.resolutions.append(128)
+        # Multi-scale blocks: 8, 16, 32, 64, ... up to img_size
+        self.resolutions = []
+        r = 8
+        while r <= img_size:
+            self.resolutions.append(r)
+            r *= 2
 
         self.blocks = nn.ModuleDict()
         self.attn = nn.ModuleDict()
