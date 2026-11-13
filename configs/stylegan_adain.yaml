@@ -2,6 +2,7 @@
 experiment:
   name: "stylegan_adain_celeba64"
   exp_dir: "experiments/stylegan_adain"
+  seed: 42
 
 model:
   type: "stylegan"
@@ -19,13 +20,13 @@ model:
 data:
   dataset_path: "data/celeba/img_align_celeba"
   use_synthetic: false
-  synthetic_samples: 1000
+  synthetic_samples: 500
   img_size: 64
-  batch_size: 32
-  num_workers: 2
+  batch_size: 16
+  num_workers: 0
 
 training:
-  total_steps: 40000
+  total_steps: 150
   lr_g: 0.0001
   lr_d: 0.0001
   beta1: 0.0
@@ -36,5 +37,5 @@ training:
   style_mixing_prob: 0.3
   ema_decay: 0.999
   amp: true
-  sample_every: 250
-  checkpoint_every: 1000
+  sample_every: 25
+  checkpoint_every: 50
