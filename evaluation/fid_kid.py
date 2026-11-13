@@ -79,19 +79,15 @@ class MetricsEvaluator:
         self.fid_metric = None
         self.kid_metric = None
 
-        prev_timeout = socket.getdefaulttimeout()
         try:
-            socket.setdefaulttimeout(1.5)
             from torchmetrics.image.fid import FrechetInceptionDistance
             from torchmetrics.image.kid import KernelInceptionDistance
             self.fid_metric = FrechetInceptionDistance(feature=feature_dim, normalize=False).to(self.device)
             self.kid_metric = KernelInceptionDistance(feature=feature_dim, subsets=10, subset_size=25, normalize=False).to(self.device)
             self.torchmetrics_available = True
-        except Exception:
+        except Exception as e:
             self.torchmetrics_available = False
             self.fallback_extractor = PerceptualFeatureBank().to(self.device).eval()
-        finally:
-            socket.setdefaulttimeout(prev_timeout)
 
     @torch.no_grad()
     def evaluate(

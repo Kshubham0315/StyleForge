@@ -50,6 +50,7 @@ def load_generator_from_checkpoint(ckpt_path: str, device: torch.device):
             img_size=img_size,
             base_channels=m_cfg.get("base_channels", 512),
             max_channels=m_cfg.get("max_channels", 512),
+            use_attention=m_cfg.get("use_attention", False),
         )
 
     # Prefer ema_generator weights if present
