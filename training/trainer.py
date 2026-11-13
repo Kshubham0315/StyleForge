@@ -164,7 +164,14 @@ class GANTrainer:
         self.opt_g.load_state_dict(state["opt_g"])
         self.opt_d.load_state_dict(state["opt_d"])
         self.global_step = state["global_step"]
-        print(f"Resumed from checkpoint: {ckpt_path} at step {self.global_step}")
+        metrics_file = self.exp_dir / "metrics.json"
+        if metrics_file.exists():
+            try:
+                with open(metrics_file, "r") as f:
+                    self.history = json.load(f)
+            except Exception:
+                pass
+        print(f"Resumed from checkpoint: {ckpt_path} at step {self.global_step} (history entries: {len(self.history)})")
 
     @torch.no_grad()
     def save_sample_grid(self, step: int):
@@ -201,9 +208,12 @@ class GANTrainer:
 
         self.scaler.scale(loss_d).backward()
 
-        if self.max_grad_norm is not None:
-            self.scaler.unscale_(self.opt_d)
-            torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
+        self.scaler.unscale_(self.opt_d)
+        grad_norm_d = torch.nn.utils.clip_grad_norm_(
+            self.critic.parameters(),
+            self.max_grad_norm if self.max_grad_norm is not None else float("inf"),
+        )
+        d_stats["critic_grad_norm"] = float(grad_norm_d.item() if hasattr(grad_norm_d, "item") else grad_norm_d)
 
         self.scaler.step(self.opt_d)
         self.scaler.update()
@@ -230,15 +240,28 @@ class GANTrainer:
 
         self.scaler.scale(loss_g).backward()
 
-        if self.max_grad_norm is not None:
-            self.scaler.unscale_(self.opt_g)
-            torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.max_grad_norm)
+        self.scaler.unscale_(self.opt_g)
+        grad_norm_g = torch.nn.utils.clip_grad_norm_(
+            self.generator.parameters(),
+            self.max_grad_norm if self.max_grad_norm is not None else float("inf"),
+        )
+        g_stats["gen_grad_norm"] = float(grad_norm_g.item() if hasattr(grad_norm_g, "item") else grad_norm_g)
+
+        # Track intermediate W-space dispersion if style generator
+        if hasattr(self.generator, "mapping"):
+            with torch.no_grad():
+                w_sample = self.generator.mapping(z[:8])
+                g_stats["w_space_std"] = float(w_sample.std().item())
 
         self.scaler.step(self.opt_g)
         self.scaler.update()
 
-        # Update EMA weights
-        self.ema_generator.update(self.generator)
+        # Update EMA weights only if generator parameters are clean (no NaN/Inf)
+        has_nan = any(torch.isnan(p).any() or torch.isinf(p).any() for p in self.generator.parameters())
+        if not has_nan:
+            self.ema_generator.update(self.generator)
+        else:
+            print(f"[Warning] Generator parameters contain NaN/Inf at step {self.global_step}. Skipping EMA update.")
 
         return g_stats
 
@@ -277,11 +300,18 @@ class GANTrainer:
 
             # Performance stats
             elapsed = time.time() - self.start_time
+            steps_done = len(self.history) + 1
+            it_per_sec = steps_done / (elapsed + 1e-6)
             max_vram_mb = torch.cuda.max_memory_allocated(self.device) / (1024 ** 2) if self.device.type == "cuda" else 0.0
+
+            # Estimate epoch based on dataloader length
+            epoch = (self.global_step * batch_size) / max(1, len(self.dataloader.dataset))
 
             step_metrics = {
                 "step": self.global_step,
+                "epoch": round(epoch, 2),
                 "elapsed_sec": round(elapsed, 2),
+                "steps_per_sec": round(it_per_sec, 2),
                 "vram_mb": round(max_vram_mb, 1),
                 "lr_g": self.lr_g,
                 "lr_d": self.lr_d,
@@ -318,11 +348,68 @@ class GANTrainer:
         pbar.close()
         self.save_sample_grid(self.global_step)
         self.save_checkpoint("checkpoint_final.pt")
+        self.save_checkpoint("checkpoint_latest.pt")
         with open(self.exp_dir / "metrics.json", "w") as f:
             json.dump(self.history, f, indent=2)
+
+        self.export_training_plots()
 
         if self.tb_writer is not None:
             self.tb_writer.close()
 
         total_time = time.time() - self.start_time
         print(f"Training completed in {total_time:.1f}s ({total_time / 60.0:.2f} min)!")
+
+    def export_training_plots(self):
+        """Exports 4-panel training trajectory figures as PNG."""
+        if not self.history:
+            return
+        try:
+            import matplotlib.pyplot as plt
+            steps = [m["step"] for m in self.history]
+            g_loss = [m.get("g_loss", 0.0) for m in self.history]
+            w_dist = [m.get("wasserstein_distance", 0.0) for m in self.history]
+            penalty = [m.get("penalty", 0.0) for m in self.history]
+            vram = [m.get("vram_mb", 0.0) for m in self.history]
+            g_norm = [m.get("gen_grad_norm", 0.0) for m in self.history]
+            d_norm = [m.get("critic_grad_norm", 0.0) for m in self.history]
+
+            fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+            # 1. Losses & Wasserstein Distance
+            axes[0, 0].plot(steps, g_loss, label="Generator Loss", color="#1f77b4", alpha=0.8)
+            axes[0, 0].plot(steps, w_dist, label="Wasserstein Distance", color="#ff7f0e", alpha=0.8)
+            axes[0, 0].set_title("Generator Loss & Wasserstein Estimate")
+            axes[0, 0].set_xlabel("Generator Step")
+            axes[0, 0].grid(True, alpha=0.3)
+            axes[0, 0].legend()
+
+            # 2. Gradient Penalty / Regularizer
+            axes[0, 1].plot(steps, penalty, label="Penalty (GP / R1)", color="#2ca02c", alpha=0.8)
+            axes[0, 1].set_title("Regularization Penalty Trajectory")
+            axes[0, 1].set_xlabel("Generator Step")
+            axes[0, 1].grid(True, alpha=0.3)
+            axes[0, 1].legend()
+
+            # 3. Gradient Norms
+            axes[1, 0].plot(steps, g_norm, label="Gen Grad Norm", color="#9467bd", alpha=0.7)
+            axes[1, 0].plot(steps, d_norm, label="Critic Grad Norm", color="#8c564b", alpha=0.7)
+            axes[1, 0].set_title("Parameter Gradient Norms")
+            axes[1, 0].set_xlabel("Generator Step")
+            axes[1, 0].grid(True, alpha=0.3)
+            axes[1, 0].legend()
+
+            # 4. GPU Memory Utilization
+            axes[1, 1].plot(steps, vram, label="CUDA VRAM (MB)", color="#d62728", alpha=0.8)
+            axes[1, 1].set_title("GPU VRAM Utilization")
+            axes[1, 1].set_xlabel("Generator Step")
+            axes[1, 1].grid(True, alpha=0.3)
+            axes[1, 1].legend()
+
+            plt.tight_layout()
+            out_plot = self.exp_dir / "training_curves.png"
+            plt.savefig(out_plot, dpi=150)
+            plt.close(fig)
+            print(f"Training trajectory plots saved to: {out_plot}")
+        except Exception as e:
+            print(f"[Warning] Failed to generate training plots: {e}")

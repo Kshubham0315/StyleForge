@@ -22,7 +22,7 @@ data:
   num_workers: 0
 
 training:
-  total_steps: 150
+  total_steps: 600
   lr_g: 0.0002
   lr_d: 0.0002
   beta1: 0.0
@@ -33,5 +33,5 @@ training:
   style_mixing_prob: 0.0
   ema_decay: 0.999
   amp: true
-  sample_every: 25
-  checkpoint_every: 50
+  sample_every: 100
+  checkpoint_every: 150

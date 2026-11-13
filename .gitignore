@@ -222,5 +222,7 @@ __marimo__/
 # StyleForge specific
 experiments/**/checkpoints/*.pt
 experiments/**/samples/*.png
+experiments/**/tb_logs/
+outputs/**/*.png
 outputs/*.png
 data/celeba/img_align_celeba/
