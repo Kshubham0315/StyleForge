@@ -1,0 +1,40 @@
+[
+  {
+    "model_name": "WGAN-GP Baseline",
+    "model_type": "wgan_baseline",
+    "steps": 600,
+    "image_resolution": "64x64",
+    "batch_size": 16,
+    "fid_inception_v3": 349.15,
+    "kid_mean": 0.50802,
+    "kid_std": 0.00722,
+    "pairwise_l1_dist": 0.0415,
+    "pairwise_l2_dist": 6.42,
+    "batch_pixel_variance": 0.00172,
+    "diversity_score": 0.42,
+    "manifold_precision": 0.0,
+    "manifold_recall": 0.0,
+    "vram_mb": 743.0,
+    "steps_per_sec": 5.62,
+    "metric_backend": "torchmetrics_inception_v3"
+  },
+  {
+    "model_name": "StyleForge AdaIN",
+    "model_type": "stylegan",
+    "steps": 600,
+    "image_resolution": "64x64",
+    "batch_size": 16,
+    "fid_inception_v3": 470.89,
+    "kid_mean": 0.70576,
+    "kid_std": 0.01869,
+    "pairwise_l1_dist": 0.6109,
+    "pairwise_l2_dist": 92.59,
+    "batch_pixel_variance": 0.35192,
+    "diversity_score": 6.11,
+    "manifold_precision": 0.0,
+    "manifold_recall": 1.0,
+    "vram_mb": 3475.0,
+    "steps_per_sec": 1.12,
+    "metric_backend": "torchmetrics_inception_v3"
+  }
+]

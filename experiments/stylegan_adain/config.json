@@ -26,7 +26,7 @@
     "num_workers": 0
   },
   "training": {
-    "total_steps": 150,
+    "total_steps": 600,
     "lr_g": 0.0001,
     "lr_d": 0.0001,
     "beta1": 0.0,
@@ -36,11 +36,11 @@
     "penalty_weight": 10.0,
     "style_mixing_prob": 0.3,
     "ema_decay": 0.999,
-    "amp": true,
-    "sample_every": 25,
-    "checkpoint_every": 50
+    "amp": false,
+    "sample_every": 100,
+    "checkpoint_every": 150
   },
-  "git_commit": "de4150970c6e0804887ad812cf1721c2e7e74736",
+  "git_commit": "7e2db3d42278346cb7cc4d44c3cc8dc11995c93f",
   "device": "cuda",
   "gpu_name": "NVIDIA GeForce RTX 4050 Laptop GPU"
 }

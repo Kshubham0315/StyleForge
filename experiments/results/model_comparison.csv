@@ -1,0 +1,3 @@
+model_name,model_type,steps,image_resolution,batch_size,fid_inception_v3,kid_mean,kid_std,pairwise_l1_dist,pairwise_l2_dist,batch_pixel_variance,diversity_score,manifold_precision,manifold_recall,vram_mb,steps_per_sec,metric_backend
+WGAN-GP Baseline,wgan_baseline,600,64x64,16,349.15,0.50802,0.00722,0.0415,6.42,0.00172,0.42,0.0,0.0,743.0,5.62,torchmetrics_inception_v3
+StyleForge AdaIN,stylegan,600,64x64,16,470.89,0.70576,0.01869,0.6109,92.59,0.35192,6.11,0.0,1.0,3475.0,1.12,torchmetrics_inception_v3

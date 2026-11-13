@@ -27,7 +27,7 @@
       "num_workers": 0
     },
     "training": {
-      "total_steps": 150,
+      "total_steps": 600,
       "lr_g": 0.0001,
       "lr_d": 0.0001,
       "beta1": 0.0,
@@ -37,24 +37,24 @@
       "penalty_weight": 10.0,
       "style_mixing_prob": 0.3,
       "ema_decay": 0.999,
-      "amp": true,
-      "sample_every": 25,
-      "checkpoint_every": 50
+      "amp": false,
+      "sample_every": 100,
+      "checkpoint_every": 150
     }
   },
   "metrics": {
     "checkpoint": "experiments/stylegan_adain/checkpoints/checkpoint_final.pt",
     "model_type": "stylegan",
-    "pairwise_l1_distance": 0.7163251638412476,
-    "pairwise_l2_distance": 103.17845153808594,
-    "batch_pixel_variance": 0.43255937099456787,
-    "diversity_score": 7.163251638412476,
+    "pairwise_l1_distance": 0.6109021306037903,
+    "pairwise_l2_distance": 92.59416198730469,
+    "batch_pixel_variance": 0.35192111134529114,
+    "diversity_score": 6.109021306037903,
     "precision": 0.0,
     "recall": 1.0,
-    "fid": 0.05202116308145582,
-    "kid_mean": 0.0,
-    "kid_std": 0.0,
-    "metric_backend": "offline_perceptual_feature_bank",
+    "fid": 470.8852233886719,
+    "kid_mean": 0.7057604193687439,
+    "kid_std": 0.018691986799240112,
+    "metric_backend": "torchmetrics_inception_v3",
     "real_samples_evaluated": 50,
     "fake_samples_evaluated": 64
   }

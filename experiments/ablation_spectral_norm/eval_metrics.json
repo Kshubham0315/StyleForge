@@ -1,0 +1,61 @@
+{
+  "config": {
+    "experiment": {
+      "name": "ablation_spectral_norm",
+      "exp_dir": "experiments/ablation_spectral_norm",
+      "seed": 42
+    },
+    "model": {
+      "type": "stylegan",
+      "latent_dim": 512,
+      "style_dim": 512,
+      "num_mapping_layers": 8,
+      "img_channels": 3,
+      "img_size": 64,
+      "base_channels": 512,
+      "max_channels": 512,
+      "use_attention": false,
+      "use_minibatch_std": true,
+      "use_spectral_norm": true
+    },
+    "data": {
+      "dataset_path": "data/celeba/img_align_celeba",
+      "use_synthetic": false,
+      "synthetic_samples": 500,
+      "img_size": 64,
+      "batch_size": 16,
+      "num_workers": 0
+    },
+    "training": {
+      "total_steps": 150,
+      "lr_g": 0.0001,
+      "lr_d": 0.0001,
+      "beta1": 0.0,
+      "beta2": 0.99,
+      "n_critic": 4,
+      "loss_mode": "wgan_gp",
+      "penalty_weight": 10.0,
+      "style_mixing_prob": 0.3,
+      "ema_decay": 0.999,
+      "amp": false,
+      "sample_every": 50,
+      "checkpoint_every": 75
+    }
+  },
+  "metrics": {
+    "checkpoint": "experiments/ablation_spectral_norm/checkpoints/checkpoint_final.pt",
+    "model_type": "stylegan",
+    "pairwise_l1_distance": 0.712191641330719,
+    "pairwise_l2_distance": 102.65789031982422,
+    "batch_pixel_variance": 0.4300656318664551,
+    "diversity_score": 7.12191641330719,
+    "precision": 0.0,
+    "recall": 1.0,
+    "fid": 474.85418701171875,
+    "kid_mean": 0.7229918837547302,
+    "kid_std": 0.015949411317706108,
+    "metric_backend": "torchmetrics_inception_v3",
+    "real_samples_evaluated": 50,
+    "fake_samples_evaluated": 64
+  }
+}

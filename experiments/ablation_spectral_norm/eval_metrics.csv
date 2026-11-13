@@ -1,0 +1,15 @@
+Metric,Value
+checkpoint,experiments/ablation_spectral_norm/checkpoints/checkpoint_final.pt
+model_type,stylegan
+pairwise_l1_distance,0.712191641330719
+pairwise_l2_distance,102.65789031982422
+batch_pixel_variance,0.4300656318664551
+diversity_score,7.12191641330719
+precision,0.0
+recall,1.0
+fid,474.85418701171875
+kid_mean,0.7229918837547302
+kid_std,0.015949411317706108
+metric_backend,torchmetrics_inception_v3
+real_samples_evaluated,50
+fake_samples_evaluated,64
