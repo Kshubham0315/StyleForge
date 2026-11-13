@@ -110,6 +110,29 @@ def verify_dataset(data_dir: str, img_size: int = 64, sample_check: int = 500):
     assert -1.01 <= batch.min().item() <= -0.5, "Min value outside expected [-1, 1] range"
     assert 0.5 <= batch.max().item() <= 1.01, "Max value outside expected [-1, 1] range"
 
+    # Save dataset metadata for research audit
+    metadata_path = data_path.parent / "dataset_metadata.json"
+    import json
+    metadata = {
+        "dataset_name": "CelebA_Pilot_Partition",
+        "data_dir": str(data_path),
+        "total_images": len(all_files),
+        "train_samples": len(train_names),
+        "val_samples": len(val_names),
+        "train_val_overlap": len(intersection),
+        "zero_leakage_verified": len(intersection) == 0,
+        "input_resolution": list(shapes)[0] if shapes else [128, 128],
+        "target_resolution": [img_size, img_size],
+        "channels": 3,
+        "normalization_range": "[-1.0, 1.0]",
+        "split_seed": 42,
+        "terms_of_use": "CelebA non-commercial research license (MMLAB CUHK)",
+        "limitation_note": "500-image subset utilized for computational tractability on 6GB VRAM hardware.",
+    }
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+    print(f"Dataset metadata recorded at: {metadata_path}")
+
     print("\n" + "=" * 60)
     print("DATASET VERIFICATION STATUS: COMPLETE & CERTIFIED")
     print("=" * 60)

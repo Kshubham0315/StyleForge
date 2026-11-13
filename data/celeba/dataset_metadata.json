@@ -1,0 +1,22 @@
+{
+  "dataset_name": "CelebA_Pilot_Partition",
+  "data_dir": "data\\celeba\\img_align_celeba",
+  "total_images": 500,
+  "train_samples": 450,
+  "val_samples": 50,
+  "train_val_overlap": 0,
+  "zero_leakage_verified": true,
+  "input_resolution": [
+    128,
+    128
+  ],
+  "target_resolution": [
+    64,
+    64
+  ],
+  "channels": 3,
+  "normalization_range": "[-1.0, 1.0]",
+  "split_seed": 42,
+  "terms_of_use": "CelebA non-commercial research license (MMLAB CUHK)",
+  "limitation_note": "500-image subset utilized for computational tractability on 6GB VRAM hardware."
+}
