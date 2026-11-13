@@ -3,6 +3,7 @@
 Includes:
 - Wasserstein GAN loss with gradient penalty (WGAN-GP)
 - Non-saturating logistic GAN loss with R1 regularization
+- Decoupled / combined loss modes for ablation studies
 - Wasserstein distance estimator and critic diagnostics
 """
 
@@ -22,7 +23,8 @@ def compute_gradient_penalty(
 
     Interpolates between real and fake images along straight lines,
     evaluates critic gradients in float32 without autocast for numerical stability,
-    and penalizes deviation of gradient norm from 1.
+    and penalizes deviation of gradient norm from 1:
+    GP = lambda * E_{x_hat} [ ( || grad_{x_hat} D(x_hat) ||_2 - 1 )^2 ]
     """
     dev_type = real_images.device.type
     with torch.amp.autocast(dev_type, enabled=False):
@@ -87,15 +89,22 @@ def compute_r1_penalty(
 
 
 class GANLoss(nn.Module):
-    """Unified GAN loss module supporting WGAN-GP and Non-Saturating R1 modes."""
+    """Unified GAN loss module supporting WGAN-GP, Non-Saturating R1, and ablation modes."""
 
-    def __init__(self, mode: str = "wgan_gp", penalty_weight: float = 10.0):
+    def __init__(
+        self,
+        mode: str = "wgan_gp",
+        penalty_weight: float = 10.0,
+        r1_gamma: float = 10.0,
+    ):
         super().__init__()
         self.mode = mode.lower()
         self.penalty_weight = penalty_weight
+        self.r1_gamma = r1_gamma
 
-        if self.mode not in ("wgan_gp", "r1", "logistic"):
-            raise ValueError(f"Unknown loss mode: {mode}. Choose 'wgan_gp', 'r1', or 'logistic'")
+        valid_modes = ("wgan_gp", "r1", "logistic", "wgan_gp_r1")
+        if self.mode not in valid_modes:
+            raise ValueError(f"Unknown loss mode: {mode}. Choose one of {valid_modes}")
 
     def critic_loss(
         self,
@@ -138,6 +147,21 @@ class GANLoss(nn.Module):
             stats["penalty"] = r1.item()
             stats["grad_norm"] = grad_norm.item()
 
+        elif self.mode == "wgan_gp_r1":
+            base_loss = fake_scores.mean() - real_scores.mean()
+            gp, gp_norm = compute_gradient_penalty(
+                critic, real_images, fake_images, gp_weight=self.penalty_weight
+            )
+            r1, r1_norm = compute_r1_penalty(
+                critic, real_images, r1_gamma=self.r1_gamma
+            )
+            total_loss = base_loss + gp + r1
+            stats["base_loss"] = base_loss.item()
+            stats["penalty"] = (gp + r1).item()
+            stats["gp"] = gp.item()
+            stats["r1"] = r1.item()
+            stats["grad_norm"] = gp_norm.item()
+
         return total_loss, stats
 
     def generator_loss(
@@ -148,7 +172,7 @@ class GANLoss(nn.Module):
         """Compute generator loss."""
         fake_scores = critic(fake_images)
 
-        if self.mode == "wgan_gp":
+        if self.mode in ("wgan_gp", "wgan_gp_r1"):
             loss = -fake_scores.mean()
         elif self.mode in ("r1", "logistic"):
             loss = F.softplus(-fake_scores).mean()

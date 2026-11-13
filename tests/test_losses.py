@@ -61,6 +61,7 @@ def test_gan_loss_modes():
     assert d_loss.ndim == 0
     assert g_loss.ndim == 0
     assert "wasserstein_distance" in d_stats
+    assert "penalty" in d_stats
 
     # R1 mode
     loss_r1 = GANLoss(mode="r1")
@@ -68,3 +69,11 @@ def test_gan_loss_modes():
     g_loss_r1, g_stats_r1 = loss_r1.generator_loss(critic, fake)
     assert d_loss_r1.ndim == 0
     assert g_loss_r1.ndim == 0
+    assert "penalty" in d_stats_r1
+
+    # Combined WGAN-GP + R1 ablation mode
+    loss_comb = GANLoss(mode="wgan_gp_r1")
+    d_loss_comb, d_stats_comb = loss_comb.critic_loss(critic, real, fake)
+    assert d_loss_comb.ndim == 0
+    assert "gp" in d_stats_comb
+    assert "r1" in d_stats_comb

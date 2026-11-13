@@ -2,10 +2,10 @@
 
 Contains standard generative layers:
 - PixelNorm
-- EqualizedLinear / EqualizedConv2d (Equalized Learning Rate)
+- EqualizedLinear / EqualizedConv2d (Equalized Learning Rate with runtime He-scaling & lr_mul)
 - Adaptive Instance Normalization (AdaIN)
 - Per-channel Noise Injection
-- Minibatch Standard Deviation
+- Minibatch Standard Deviation with robust group tiling
 - Self-Attention 2D (SAGAN)
 """
 
@@ -19,7 +19,8 @@ import torch.nn.functional as F
 class PixelNorm(nn.Module):
     """Pixel Normalization layer.
 
-    Normalizes the feature vector in each pixel to unit length across channels.
+    Normalizes the feature vector in each pixel to unit length across channels:
+    y = x / sqrt(mean(x^2) + eps)
     Prevents signal magnitudes from escalating out of control in early layers.
     """
 
@@ -31,37 +32,37 @@ class PixelNorm(nn.Module):
         return x * torch.rsqrt(torch.mean(x ** 2, dim=1, keepdim=True) + self.epsilon)
 
 
-class EqualizedWeight(nn.Module):
-    """Runtime weight scaling according to He (Kaiming) initialization.
-
-    Preserves dynamic range and stabilizes gradient flow across different layers.
-    """
-
-    def __init__(self, weight: nn.Parameter, gain: float = 2.0 ** 0.5):
-        super().__init__()
-        self.gain = gain
-        fan_in = weight.data[0][0].numel() if weight.dim() > 2 else weight.size(1)
-        self.scale = gain / math.sqrt(fan_in)
-
-    def forward(self, weight: nn.Parameter) -> torch.Tensor:
-        return weight * self.scale
-
-
 class EqualizedLinear(nn.Module):
-    """Linear layer with equalized learning rate."""
+    """Linear layer with equalized learning rate (runtime He scaling) and lr_mul."""
 
-    def __init__(self, in_features: int, out_features: int, bias: bool = True, gain: float = 2.0 ** 0.5):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = True,
+        gain: float = 2.0 ** 0.5,
+        lr_mul: float = 1.0,
+    ):
         super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.lr_mul = lr_mul
+
+        # Initialize weights ~ N(0, 1) as required by runtime He scaling
         self.weight = nn.Parameter(torch.randn(out_features, in_features))
         if bias:
             self.bias = nn.Parameter(torch.zeros(out_features))
         else:
             self.register_parameter("bias", None)
-        self.scale = gain / math.sqrt(in_features)
+
+        self.scale = (gain / math.sqrt(in_features)) * lr_mul
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         w = self.weight * self.scale
-        return F.linear(x, w, self.bias)
+        if self.bias is not None:
+            b = self.bias * self.lr_mul
+            return F.linear(x, w, b)
+        return F.linear(x, w)
 
 
 class EqualizedConv2d(nn.Module):
@@ -76,10 +77,13 @@ class EqualizedConv2d(nn.Module):
         padding: int = 1,
         bias: bool = True,
         gain: float = 2.0 ** 0.5,
+        lr_mul: float = 1.0,
     ):
         super().__init__()
         self.stride = stride
         self.padding = padding
+        self.lr_mul = lr_mul
+
         self.weight = nn.Parameter(
             torch.randn(out_channels, in_channels, kernel_size, kernel_size)
         )
@@ -89,11 +93,12 @@ class EqualizedConv2d(nn.Module):
             self.register_parameter("bias", None)
 
         fan_in = in_channels * (kernel_size ** 2)
-        self.scale = gain / math.sqrt(fan_in)
+        self.scale = (gain / math.sqrt(fan_in)) * lr_mul
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         w = self.weight * self.scale
-        return F.conv2d(x, w, self.bias, stride=self.stride, padding=self.padding)
+        b = self.bias * self.lr_mul if self.bias is not None else None
+        return F.conv2d(x, w, b, stride=self.stride, padding=self.padding)
 
 
 class NoiseInjection(nn.Module):
@@ -105,6 +110,7 @@ class NoiseInjection(nn.Module):
 
     def __init__(self, channels: int):
         super().__init__()
+        # Initialized to zero so noise does not disturb early structural convergence
         self.weight = nn.Parameter(torch.zeros(1, channels, 1, 1))
 
     def forward(self, x: torch.Tensor, noise: Optional[torch.Tensor] = None) -> torch.Tensor:
@@ -118,7 +124,8 @@ class AdaIN(nn.Module):
     """Adaptive Instance Normalization.
 
     Normalizes input feature map x to zero-mean and unit variance, then modulates
-    it using scale (y_s) and bias (y_b) derived from intermediate style vector w.
+    it using scale (y_s) and bias (y_b) derived from intermediate style vector w:
+    AdaIN(x, y) = y_s * ( (x - mu(x)) / sigma(x) ) + y_b
     """
 
     def __init__(self, style_dim: int, num_features: int, eps: float = 1e-5):
@@ -129,16 +136,17 @@ class AdaIN(nn.Module):
         self.style_mod = EqualizedLinear(style_dim, num_features * 2, gain=1.0)
 
     def forward(self, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
-        # Standard instance normalization (without learnable affine params)
+        # Standard instance normalization across spatial dims (H, W)
         mean = x.mean(dim=[2, 3], keepdim=True)
         var = x.var(dim=[2, 3], keepdim=True, unbiased=False)
         normalized = (x - mean) / torch.sqrt(var + self.eps)
 
-        # Style modulation: shape (B, 2 * num_features)
+        # Style modulation: chunk into scale and bias
         style = self.style_mod(w)
-        style = style.view(-1, 2, self.num_features, 1, 1)
-        scale = style[:, 0] + 1.0  # Center scale around 1.0
-        bias = style[:, 1]
+        scale, bias = style.chunk(2, dim=1)
+
+        scale = (scale + 1.0).unsqueeze(-1).unsqueeze(-1)
+        bias = bias.unsqueeze(-1).unsqueeze(-1)
 
         return normalized * scale + bias
 
@@ -147,7 +155,7 @@ class MinibatchStdDev(nn.Module):
     """Minibatch Standard Deviation Layer.
 
     Computes standard deviation of features across the minibatch for each spatial location,
-    averages over all features and locations, and appends the result as a constant feature map.
+    averages over all features and locations, and appends the result as an extra feature map.
     Helps discriminator detect mode collapse.
     """
 
@@ -157,23 +165,28 @@ class MinibatchStdDev(nn.Module):
         self.eps = eps
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        batch_size, channels, height, width = x.shape
-        group_size = min(batch_size, self.group_size)
+        N, C, H, W = x.shape
+        G = min(N, self.group_size)
+        if N % G != 0:
+            G = 1  # Fallback to single group across whole batch
 
-        # Reshape to (groups, group_size, channels, height, width)
-        if batch_size % group_size == 0 and batch_size > group_size:
-            y = x.view(group_size, -1, channels, height, width)
-            # Variance over group
-            y = torch.var(y, dim=0, unbiased=False)
+        if G > 1:
+            # Group into (num_groups, group_size, C, H, W)
+            num_groups = N // G
+            y = x.view(num_groups, G, C, H, W)
+            # Variance across group members (dim 1)
+            y = torch.var(y, dim=1, unbiased=False)
             y = torch.sqrt(y + self.eps)
-            # Mean over all features and spatial locations -> (group_count, 1, 1, 1)
+            # Mean across channels and spatial locations -> (num_groups, 1, 1, 1)
             y = y.mean(dim=[1, 2, 3], keepdim=True)
-            # Replicate over group_size to match batch_size
-            y = y.repeat(group_size, 1, height, width)
+            # Expand along group members to match batch size N -> (num_groups, G, 1, H, W)
+            y = y.view(num_groups, 1, 1, 1, 1).expand(-1, G, -1, H, W)
+            # Reshape back to (N, 1, H, W)
+            y = y.contiguous().view(N, 1, H, W)
         else:
             y = torch.var(x, dim=0, unbiased=False)
             y = torch.sqrt(y + self.eps)
-            y = y.mean().view(1, 1, 1, 1).repeat(batch_size, 1, height, width)
+            y = y.mean().view(1, 1, 1, 1).expand(N, 1, H, W)
 
         return torch.cat([x, y], dim=1)
 

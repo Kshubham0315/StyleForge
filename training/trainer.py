@@ -2,16 +2,20 @@
 
 Provides a unified, robust training loop featuring:
 - Exponential Moving Average (EMA) of Generator parameters
-- Gradient Penalty / R1 regularization
+- Gradient Penalty / R1 regularization (FP32 safe)
 - n_critic updates per generator step
 - Mixed precision AMP training (fp16) on CUDA
-- Fixed latent vector snapshot generation for consistent visual tracking
-- Comprehensive metrics logging and checkpointing
+- NaN / Inf gradient anomaly detection & optional gradient clipping
+- TensorBoard logging + JSON metrics history
+- VRAM usage & training throughput monitoring
+- Git commit hash & environment snapshot in checkpoint metadata
 """
 
 import copy
 import json
 import os
+import subprocess
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 import torch
@@ -23,8 +27,17 @@ from tqdm import tqdm
 from training.losses import GANLoss
 
 
+def get_git_commit_hash() -> str:
+    """Retrieves current git commit hash if in a git repo."""
+    try:
+        out = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
+        return out.decode("utf-8").strip()
+    except Exception:
+        return "unknown"
+
+
 class ExponentialMovingAverage:
-    """Maintains an exponential moving average of model parameters."""
+    """Maintains an exponential moving average of model parameters and buffers."""
 
     def __init__(self, model: nn.Module, decay: float = 0.999):
         self.decay = decay
@@ -60,7 +73,7 @@ class GANTrainer:
         self.critic = critic.to(self.device)
 
         # EMA generator
-        ema_decay = config.get("training", {}).get("ema_decay", 0.999)
+        ema_decay = float(config.get("training", {}).get("ema_decay", 0.999))
         self.ema_generator = ExponentialMovingAverage(self.generator, decay=ema_decay)
 
         # Optimizers
@@ -71,16 +84,20 @@ class GANTrainer:
 
         self.opt_g = torch.optim.Adam(self.generator.parameters(), lr=lr_g, betas=(beta1, beta2))
         self.opt_d = torch.optim.Adam(self.critic.parameters(), lr=lr_d, betas=(beta1, beta2))
+        self.lr_g = lr_g
+        self.lr_d = lr_d
 
         # Loss
         loss_mode = config.get("training", {}).get("loss_mode", "wgan_gp")
         penalty_weight = float(config.get("training", {}).get("penalty_weight", 10.0))
-        self.loss_fn = GANLoss(mode=loss_mode, penalty_weight=penalty_weight)
+        r1_gamma = float(config.get("training", {}).get("r1_gamma", 10.0))
+        self.loss_fn = GANLoss(mode=loss_mode, penalty_weight=penalty_weight, r1_gamma=r1_gamma)
 
         # Training parameters
         self.n_critic = int(config.get("training", {}).get("n_critic", 5))
         self.latent_dim = int(config.get("model", {}).get("latent_dim", 512))
         self.style_mixing_prob = float(config.get("training", {}).get("style_mixing_prob", 0.0))
+        self.max_grad_norm = config.get("training", {}).get("max_grad_norm", None)
 
         # Output dirs
         self.exp_dir = Path(config.get("experiment", {}).get("exp_dir", "experiments/default"))
@@ -89,12 +106,28 @@ class GANTrainer:
         self.samples_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save config snapshot
-        with open(self.exp_dir / "config.json", "w") as f:
-            json.dump(config, f, indent=2)
+        # TensorBoard writer (if available)
+        self.tb_writer = None
+        try:
+            from torch.utils.tensorboard import SummaryWriter
+            self.tb_writer = SummaryWriter(log_dir=str(self.exp_dir / "tb_logs"))
+        except Exception:
+            pass
 
-        # Fixed latents for progress snapshots
-        self.fixed_z = torch.randn(min(16, config.get("training", {}).get("batch_size", 16)), self.latent_dim, device=self.device)
+        # Save config snapshot with git commit
+        config_snapshot = copy.deepcopy(config)
+        config_snapshot["git_commit"] = get_git_commit_hash()
+        config_snapshot["device"] = str(self.device)
+        if torch.cuda.is_available():
+            config_snapshot["gpu_name"] = torch.cuda.get_device_name(0)
+
+        with open(self.exp_dir / "config.json", "w") as f:
+            json.dump(config_snapshot, f, indent=2)
+
+        # Fixed latents for progress snapshots (seed fixed)
+        g_cpu = torch.Generator().manual_seed(42)
+        n_fixed = min(16, config.get("training", {}).get("batch_size", 16))
+        self.fixed_z = torch.randn(n_fixed, self.latent_dim, generator=g_cpu).to(self.device)
 
         # AMP
         use_amp = config.get("training", {}).get("amp", True) and (self.device.type == "cuda")
@@ -103,9 +136,10 @@ class GANTrainer:
 
         self.global_step = 0
         self.history = []
+        self.start_time = None
 
     def save_checkpoint(self, filename: str = "checkpoint_latest.pt"):
-        """Save model and optimizer states."""
+        """Save model, EMA, and optimizer states."""
         ckpt_path = self.checkpoints_dir / filename
         state = {
             "global_step": self.global_step,
@@ -115,12 +149,14 @@ class GANTrainer:
             "opt_g": self.opt_g.state_dict(),
             "opt_d": self.opt_d.state_dict(),
             "config": self.config,
+            "git_commit": get_git_commit_hash(),
+            "timestamp": time.time(),
         }
         torch.save(state, ckpt_path)
         print(f"Checkpoint saved at step {self.global_step}: {ckpt_path}")
 
     def load_checkpoint(self, ckpt_path: str):
-        """Restore model and optimizer states."""
+        """Restore model, EMA, and optimizer states."""
         state = torch.load(ckpt_path, map_location=self.device, weights_only=False)
         self.generator.load_state_dict(state["generator"])
         self.critic.load_state_dict(state["critic"])
@@ -140,6 +176,9 @@ class GANTrainer:
         grid_path = self.samples_dir / f"step_{step:06d}.png"
         save_image(fake, grid_path, nrow=4)
 
+        if self.tb_writer is not None:
+            self.tb_writer.add_images("EMA_Generated_Samples", fake, global_step=step)
+
     def train_step_critic(self, real_images: torch.Tensor) -> Dict[str, float]:
         """Single training step for critic."""
         batch_size = real_images.size(0)
@@ -155,7 +194,17 @@ class GANTrainer:
 
             loss_d, d_stats = self.loss_fn.critic_loss(self.critic, real_images, fake_images)
 
+        # Gradient anomaly detection
+        if torch.isnan(loss_d) or torch.isinf(loss_d):
+            print(f"[Warning] Critic loss NaN/Inf at step {self.global_step}. Skipping step.")
+            return d_stats
+
         self.scaler.scale(loss_d).backward()
+
+        if self.max_grad_norm is not None:
+            self.scaler.unscale_(self.opt_d)
+            torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
+
         self.scaler.step(self.opt_d)
         self.scaler.update()
 
@@ -175,7 +224,16 @@ class GANTrainer:
 
             loss_g, g_stats = self.loss_fn.generator_loss(self.critic, fake_images)
 
+        if torch.isnan(loss_g) or torch.isinf(loss_g):
+            print(f"[Warning] Generator loss NaN/Inf at step {self.global_step}. Skipping step.")
+            return g_stats
+
         self.scaler.scale(loss_g).backward()
+
+        if self.max_grad_norm is not None:
+            self.scaler.unscale_(self.opt_g)
+            torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.max_grad_norm)
+
         self.scaler.step(self.opt_g)
         self.scaler.update()
 
@@ -184,8 +242,9 @@ class GANTrainer:
 
         return g_stats
 
-    def train(self, total_steps: int, sample_every: int = 500, checkpoint_every: int = 1000):
+    def train(self, total_steps: int, sample_every: int = 250, checkpoint_every: int = 1000):
         """Main training loop driven by total generator steps."""
+        self.start_time = time.time()
         print(f"Starting training on {self.device} for {total_steps} steps...")
         data_iter = iter(self.dataloader)
 
@@ -201,6 +260,9 @@ class GANTrainer:
                     data_iter = iter(self.dataloader)
                     real_images = next(data_iter)
 
+                if isinstance(real_images, (list, tuple)):
+                    real_images = real_images[0]
+
                 real_images = real_images.to(self.device, non_blocking=True)
                 d_stats = self.train_step_critic(real_images)
 
@@ -213,19 +275,33 @@ class GANTrainer:
             self.global_step += 1
             pbar.update(1)
 
-            # Combined metrics
+            # Performance stats
+            elapsed = time.time() - self.start_time
+            max_vram_mb = torch.cuda.max_memory_allocated(self.device) / (1024 ** 2) if self.device.type == "cuda" else 0.0
+
             step_metrics = {
                 "step": self.global_step,
+                "elapsed_sec": round(elapsed, 2),
+                "vram_mb": round(max_vram_mb, 1),
+                "lr_g": self.lr_g,
+                "lr_d": self.lr_d,
                 **d_stats_accum,
                 **g_stats,
             }
             self.history.append(step_metrics)
+
+            # TensorBoard logging
+            if self.tb_writer is not None:
+                for k, v in step_metrics.items():
+                    if isinstance(v, (int, float)):
+                        self.tb_writer.add_scalar(f"train/{k}", v, global_step=self.global_step)
 
             # Update progress bar
             pbar.set_postfix({
                 "W-Dist": f"{d_stats_accum.get('wasserstein_distance', 0.0):.3f}",
                 "G_Loss": f"{g_stats.get('g_loss', 0.0):.3f}",
                 "GP/R1": f"{d_stats_accum.get('penalty', 0.0):.3f}",
+                "VRAM": f"{max_vram_mb:.0f}M",
             })
 
             # Periodic visual snapshots
@@ -236,13 +312,17 @@ class GANTrainer:
             if self.global_step % checkpoint_every == 0:
                 self.save_checkpoint(f"checkpoint_step_{self.global_step:06d}.pt")
                 self.save_checkpoint("checkpoint_latest.pt")
-                # Write history log
                 with open(self.exp_dir / "metrics.json", "w") as f:
-                    json.dump(self.history, f)
+                    json.dump(self.history, f, indent=2)
 
         pbar.close()
         self.save_sample_grid(self.global_step)
         self.save_checkpoint("checkpoint_final.pt")
         with open(self.exp_dir / "metrics.json", "w") as f:
-            json.dump(self.history, f)
-        print("Training completed successfully!")
+            json.dump(self.history, f, indent=2)
+
+        if self.tb_writer is not None:
+            self.tb_writer.close()
+
+        total_time = time.time() - self.start_time
+        print(f"Training completed in {total_time:.1f}s ({total_time / 60.0:.2f} min)!")

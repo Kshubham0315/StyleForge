@@ -1,7 +1,7 @@
 """StyleForge Style-Based Generator.
 
 Implements the core StyleGAN generative concepts:
-- Mapping Network (f: Z -> W) with PixelNorm and equalized linear layers
+- Mapping Network (f: Z -> W) with PixelNorm, lr_mul=0.01, and equalized linear layers
 - Synthesis Network starting from a learned constant 4x4 spatial tensor
 - Adaptive Instance Normalization (AdaIN) for style modulation
 - Per-channel stochastic noise injection
@@ -29,6 +29,7 @@ class MappingNetwork(nn.Module):
 
     Maps Gaussian latent vector z to intermediate latent space W.
     Disentangles factors of variation and enables linear style manipulation.
+    Uses lr_mul=0.01 to stabilize intermediate manifold convergence.
     """
 
     def __init__(
@@ -46,13 +47,13 @@ class MappingNetwork(nn.Module):
         layers = []
         for i in range(num_layers):
             in_dim = latent_dim if i == 0 else style_dim
-            layers.append(EqualizedLinear(in_dim, style_dim, gain=2.0 ** 0.5))
+            layers.append(EqualizedLinear(in_dim, style_dim, gain=2.0 ** 0.5, lr_mul=lr_mul))
             layers.append(nn.LeakyReLU(0.2, inplace=True))
 
         self.net = nn.Sequential(*layers)
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
-        # Normalize input latent vector
+        # Normalize input latent vector on unit hypersphere
         z = self.pixel_norm(z)
         return self.net(z)
 
@@ -253,6 +254,7 @@ class StyleGenerator(nn.Module):
             latent_dim=latent_dim,
             style_dim=style_dim,
             num_layers=num_mapping_layers,
+            lr_mul=0.01,
         )
         self.synthesis = SynthesisNetwork(
             style_dim=style_dim,
@@ -311,7 +313,6 @@ class StyleGenerator(nn.Module):
 
             # Random crossover layer
             crossover = torch.randint(1, self.num_style_layers, (1,)).item()
-            # Broadcast to (B, num_style_layers, style_dim)
             styles = []
             for i in range(self.num_style_layers):
                 styles.append(w if i < crossover else w2)
@@ -331,11 +332,14 @@ class StyleGenerator(nn.Module):
         self,
         w: torch.Tensor,
         truncation_psi: float = 1.0,
+        truncation_cutoff: Optional[int] = None,
     ) -> torch.Tensor:
         """Generate directly from intermediate style tensor w.
 
         Args:
             w: Style tensor of shape (B, style_dim) or (B, num_layers, style_dim).
+            truncation_psi: Truncation coefficient.
+            truncation_cutoff: Max layer to apply truncation to.
         """
         if w.dim() == 2:
             styles = w.unsqueeze(1).repeat(1, self.num_style_layers, 1)
@@ -343,7 +347,8 @@ class StyleGenerator(nn.Module):
             styles = w.clone()
 
         if truncation_psi < 1.0:
+            cutoff = truncation_cutoff if truncation_cutoff is not None else self.num_style_layers
             w_avg_expanded = self.w_avg.view(1, 1, -1)
-            styles = w_avg_expanded + truncation_psi * (styles - w_avg_expanded)
+            styles[:, :cutoff, :] = w_avg_expanded + truncation_psi * (styles[:, :cutoff, :] - w_avg_expanded)
 
         return self.synthesis(styles)

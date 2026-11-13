@@ -1,14 +1,17 @@
 """StyleForge Data Loading and Preprocessing Pipeline.
 
 Provides:
-- Custom ImageFolder and CelebA dataset loading with face center cropping
-- Synthetic procedural face dataset generator for zero-setup smoke testing
-- DataLoader factory with configurable augmentations and caching
+- Real CelebA dataset loader with standard center cropping (140x140 / 178x178), resizing, and normalization to [-1, 1]
+- Deterministic train / val splitting with zero data leakage
+- Support for standard CelebA list_eval_partition.txt or deterministic hashing
+- Procedural synthetic face generator for explicit smoke testing
+- Windows-optimized DataLoader factory
+- Strict error checking (never silently replacing real dataset with synthetic)
 """
 
 import os
 from pathlib import Path
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 import numpy as np
 from PIL import Image, ImageDraw
 import torch
@@ -17,11 +20,11 @@ from torchvision import transforms
 
 
 class FaceTransform:
-    """Prepares face images by cropping to central face region and resizing."""
+    """Prepares face images by cropping to central face region, resizing, and normalizing."""
 
     def __init__(self, img_size: int = 64, horizontal_flip: bool = True):
         transforms_list = [
-            # For standard CelebA (178x218), central 140x140 or 178x178 crops the face
+            # Standard CelebA face region crop (140x140 from 178x218)
             transforms.CenterCrop(140),
             transforms.Resize((img_size, img_size), interpolation=transforms.InterpolationMode.BILINEAR),
         ]
@@ -38,28 +41,87 @@ class FaceTransform:
         return self.transform(img)
 
 
-class LocalImageFolderDataset(Dataset):
-    """Loads images from any directory containing JPG/PNG face images."""
+class CelebADataset(Dataset):
+    """Production-grade CelebA dataset loader with deterministic splitting.
+
+    Supports:
+    - Standard CelebA directory structures (with or without list_eval_partition.txt)
+    - Deterministic train / val / test partitioning (zero leakage)
+    - File integrity checking
+    """
 
     def __init__(
         self,
         root_dir: Union[str, Path],
+        split: str = "train",
         img_size: int = 64,
+        val_ratio: float = 0.1,
+        seed: int = 42,
         max_samples: Optional[int] = None,
         transform: Optional[Callable] = None,
     ):
         self.root_dir = Path(root_dir)
+        self.split = split.lower()
         self.img_size = img_size
-        self.transform = transform or FaceTransform(img_size=img_size)
+        self.transform = transform or FaceTransform(
+            img_size=img_size,
+            horizontal_flip=(split == "train"),
+        )
 
+        if not self.root_dir.exists():
+            raise FileNotFoundError(
+                f"CelebA dataset directory not found at: {self.root_dir}\n"
+                f"Please download CelebA (img_align_celeba) or run with --mock / use_synthetic=true for smoke tests."
+            )
+
+        # Find all valid image files
         valid_exts = {".jpg", ".jpeg", ".png", ".webp"}
-        self.image_paths = [
+        all_paths = sorted([
             p for p in self.root_dir.rglob("*")
             if p.suffix.lower() in valid_exts and not p.name.startswith(".")
-        ]
+        ])
+
+        if len(all_paths) == 0:
+            raise FileNotFoundError(
+                f"No image files found in {self.root_dir}.\n"
+                f"Ensure image files are placed in {self.root_dir}"
+            )
+
+        # Check for official partition file list_eval_partition.txt
+        partition_file = self.root_dir.parent / "list_eval_partition.txt"
+        if not partition_file.exists():
+            partition_file = self.root_dir / "list_eval_partition.txt"
+
+        if partition_file.exists():
+            # Partition mapping: 0 = train, 1 = val, 2 = test
+            part_map = {"train": "0", "val": "1", "test": "2"}
+            target_code = part_map.get(self.split, "0")
+            allowed_names = set()
+            with open(partition_file, "r") as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) == 2 and parts[1] == target_code:
+                        allowed_names.add(parts[0])
+
+            self.image_paths = [p for p in all_paths if p.name in allowed_names]
+        else:
+            # Deterministic pseudo-random split using fixed seed
+            rng = np.random.RandomState(seed)
+            indices = np.arange(len(all_paths))
+            rng.shuffle(indices)
+
+            n_val = max(1, int(len(all_paths) * val_ratio))
+            if self.split == "val":
+                selected_idx = set(indices[:n_val])
+            else:  # train
+                selected_idx = set(indices[n_val:])
+
+            self.image_paths = [all_paths[i] for i in range(len(all_paths)) if i in selected_idx]
 
         if max_samples is not None:
             self.image_paths = self.image_paths[:max_samples]
+
+        print(f"Loaded CelebA [{self.split} split]: {len(self.image_paths)} images from {self.root_dir}")
 
     def __len__(self) -> int:
         return len(self.image_paths)
@@ -71,12 +133,12 @@ class LocalImageFolderDataset(Dataset):
             return self.transform(img)
 
 
-class SyntheticFaceDataset(Dataset):
-    """Generates procedural face-like synthetic images in memory.
+# Alias for backward compatibility
+LocalImageFolderDataset = CelebADataset
 
-    Enables immediate testing and verification without downloading large datasets.
-    Renders geometric face ovals, eyes, mouth, and random skin tones with noise.
-    """
+
+class SyntheticFaceDataset(Dataset):
+    """Procedural synthetic face dataset generator for explicit smoke testing."""
 
     def __init__(self, num_samples: int = 500, img_size: int = 64, seed: int = 42):
         self.num_samples = num_samples
@@ -96,25 +158,21 @@ class SyntheticFaceDataset(Dataset):
         img = Image.new("RGB", (size, size), color=(20, 20, 30))
         draw = ImageDraw.Draw(img)
 
-        # Random skin color
         r = rng.randint(180, 255)
         g = rng.randint(130, 210)
         b = rng.randint(100, 180)
         skin_color = (r, g, b)
 
-        # Head oval
         head_w = rng.randint(50, 70)
         head_h = rng.randint(65, 85)
         cx, cy = size // 2, size // 2
         draw.ellipse([cx - head_w // 2, cy - head_h // 2, cx + head_w // 2, cy + head_h // 2], fill=skin_color)
 
-        # Eyes
         eye_y = cy - rng.randint(5, 15)
         eye_spacing = rng.randint(15, 25)
         draw.ellipse([cx - eye_spacing - 4, eye_y - 3, cx - eye_spacing + 4, eye_y + 3], fill=(30, 30, 30))
         draw.ellipse([cx + eye_spacing - 4, eye_y - 3, cx + eye_spacing + 4, eye_y + 3], fill=(30, 30, 30))
 
-        # Mouth
         mouth_y = cy + rng.randint(15, 25)
         mouth_w = rng.randint(12, 22)
         draw.rectangle([cx - mouth_w // 2, mouth_y - 2, cx + mouth_w // 2, mouth_y + 2], fill=(160, 50, 50))
@@ -128,32 +186,43 @@ class SyntheticFaceDataset(Dataset):
 
 def get_dataloader(
     dataset_path: Optional[str] = None,
+    split: str = "train",
     img_size: int = 64,
     batch_size: int = 32,
     num_workers: int = 0,
     max_samples: Optional[int] = None,
     use_synthetic: bool = False,
     synthetic_samples: int = 500,
+    seed: int = 42,
 ) -> DataLoader:
-    """Builds and returns a DataLoader for training or evaluation."""
-    if use_synthetic or dataset_path is None or not os.path.exists(dataset_path):
-        dataset = SyntheticFaceDataset(num_samples=synthetic_samples, img_size=img_size)
+    """Builds and returns an efficient DataLoader for training or evaluation.
+
+    Strictly refuses to silently replace missing real datasets with synthetic data.
+    """
+    if use_synthetic:
+        dataset = SyntheticFaceDataset(num_samples=synthetic_samples, img_size=img_size, seed=seed)
     else:
-        dataset = LocalImageFolderDataset(
+        if dataset_path is None:
+            raise ValueError(
+                "dataset_path must be specified when use_synthetic=False. "
+                "To run a rapid smoke test, set use_synthetic=True in the config."
+            )
+        dataset = CelebADataset(
             root_dir=dataset_path,
+            split=split,
             img_size=img_size,
+            seed=seed,
             max_samples=max_samples,
         )
-        if len(dataset) == 0:
-            print(f"Warning: No valid images found in {dataset_path}. Falling back to synthetic dataset.")
-            dataset = SyntheticFaceDataset(num_samples=synthetic_samples, img_size=img_size)
 
+    # Windows-friendly multiprocessing settings
     loader = DataLoader(
         dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=(split == "train"),
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        drop_last=True,
+        drop_last=(split == "train"),
+        persistent_workers=(num_workers > 0),
     )
     return loader

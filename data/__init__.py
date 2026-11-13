@@ -2,6 +2,7 @@
 
 from data.dataset import (
     FaceTransform,
+    CelebADataset,
     LocalImageFolderDataset,
     SyntheticFaceDataset,
     get_dataloader,
@@ -9,6 +10,7 @@ from data.dataset import (
 
 __all__ = [
     "FaceTransform",
+    "CelebADataset",
     "LocalImageFolderDataset",
     "SyntheticFaceDataset",
     "get_dataloader",

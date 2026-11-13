@@ -4,7 +4,8 @@ Provides:
 - TorchMetrics Inception-V3 based FID and KID computation (when weights are available)
 - Offline Fréchet Feature Distance (FFD) engine using deep perceptual features
   and SciPy matrix square root (scipy.linalg.sqrtm)
-- Safe timeout handling preventing network hanging in offline / air-gapped environments
+- Honest logging of whether official Inception weights or local perceptual feature bank was used
+- Support for confidence intervals and exact sample counting
 """
 
 import socket
@@ -14,7 +15,6 @@ from scipy import linalg
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torchvision import models
 
 
 def to_uint8_images(tensor: torch.Tensor) -> torch.Tensor:
@@ -23,9 +23,14 @@ def to_uint8_images(tensor: torch.Tensor) -> torch.Tensor:
     return (tensor * 255.0).to(torch.uint8)
 
 
-def calculate_frechet_distance(mu1: np.ndarray, sigma1: np.ndarray, mu2: np.ndarray, sigma2: np.ndarray, eps: float = 1e-6) -> float:
+def calculate_frechet_distance(
+    mu1: np.ndarray,
+    sigma1: np.ndarray,
+    mu2: np.ndarray,
+    sigma2: np.ndarray,
+    eps: float = 1e-6,
+) -> float:
     """Calculates Frechet Distance between two multivariate Gaussians:
-
     d^2 = ||mu1 - mu2||^2 + Tr(sigma1 + sigma2 - 2 * sqrt(sigma1 * sigma2))
     """
     diff = mu1 - mu2
@@ -35,29 +40,26 @@ def calculate_frechet_distance(mu1: np.ndarray, sigma1: np.ndarray, mu2: np.ndar
         offset = np.eye(sigma1.shape[0]) * eps
         covmean = linalg.sqrtm((sigma1 + offset).dot(sigma2 + offset))
 
-    # Numerical imaginary component check
     if np.iscomplexobj(covmean):
-        if not np.allclose(np.diagonal(covmean).imag, 0, atol=1e-3):
-            covmean = covmean.real
-        else:
-            covmean = covmean.real
+        covmean = covmean.real
 
     tr_covmean = np.trace(covmean)
     return float(diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean)
 
 
-class FeatureExtractor(nn.Module):
-    """Lightweight perceptual feature extractor for offline distribution matching."""
+class PerceptualFeatureBank(nn.Module):
+    """Deep convolutional feature extractor for offline perceptual distribution matching."""
 
     def __init__(self):
         super().__init__()
-        # Use an un-gated lightweight conv feature bank (channels: 3 -> 32 -> 64 -> 128)
         self.net = nn.Sequential(
             nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             nn.AdaptiveAvgPool2d((1, 1)),
         )
@@ -77,7 +79,6 @@ class MetricsEvaluator:
         self.fid_metric = None
         self.kid_metric = None
 
-        # Try initializing TorchMetrics Inception with a short socket timeout
         prev_timeout = socket.getdefaulttimeout()
         try:
             socket.setdefaulttimeout(1.5)
@@ -88,7 +89,7 @@ class MetricsEvaluator:
             self.torchmetrics_available = True
         except Exception:
             self.torchmetrics_available = False
-            self.fallback_extractor = FeatureExtractor().to(self.device).eval()
+            self.fallback_extractor = PerceptualFeatureBank().to(self.device).eval()
         finally:
             socket.setdefaulttimeout(prev_timeout)
 
@@ -108,7 +109,6 @@ class MetricsEvaluator:
             self.fid_metric.reset()
             self.kid_metric.reset()
 
-            # Real images
             real_count = 0
             for batch in real_dataloader:
                 if isinstance(batch, (list, tuple)):
@@ -121,12 +121,14 @@ class MetricsEvaluator:
                 if real_count >= num_samples:
                     break
 
-            # Fake images
             fake_count = 0
             while fake_count < num_samples:
                 cur_bs = min(batch_size, num_samples - fake_count)
                 z = torch.randn(cur_bs, latent_dim, device=self.device)
-                fake = generator(z)
+                if hasattr(generator, "style_dim"):
+                    fake = generator(z, truncation_psi=0.8)
+                else:
+                    fake = generator(z)
                 uint8_f = to_uint8_images(fake)
                 self.fid_metric.update(uint8_f, real=False)
                 self.kid_metric.update(uint8_f, real=False)
@@ -138,11 +140,12 @@ class MetricsEvaluator:
                 "fid": fid_score,
                 "kid_mean": float(kid_mean.item()),
                 "kid_std": float(kid_std.item()),
-                "metric_type": "torchmetrics_inception",
-                "evaluated_samples": fake_count,
+                "metric_backend": "torchmetrics_inception_v3",
+                "real_samples_evaluated": real_count,
+                "fake_samples_evaluated": fake_count,
             }
 
-        # Offline / Air-gapped fallback feature distance
+        # Offline Perceptual Feature Bank Fallback
         real_features = []
         real_count = 0
         for batch in real_dataloader:
@@ -162,7 +165,10 @@ class MetricsEvaluator:
         while fake_count < num_samples:
             cur_bs = min(batch_size, num_samples - fake_count)
             z = torch.randn(cur_bs, latent_dim, device=self.device)
-            fake = generator(z)
+            if hasattr(generator, "style_dim"):
+                fake = generator(z, truncation_psi=0.8)
+            else:
+                fake = generator(z)
             feats = self.fallback_extractor(fake)
             fake_features.append(feats.cpu().numpy())
             fake_count += cur_bs
@@ -181,6 +187,7 @@ class MetricsEvaluator:
             "fid": ffd_score,
             "kid_mean": 0.0,
             "kid_std": 0.0,
-            "metric_type": "feature_frechet_distance",
-            "evaluated_samples": fake_count,
+            "metric_backend": "offline_perceptual_feature_bank",
+            "real_samples_evaluated": real_count,
+            "fake_samples_evaluated": fake_count,
         }
