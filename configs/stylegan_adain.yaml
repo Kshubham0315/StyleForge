@@ -1,0 +1,40 @@
+# StyleForge Style-Based Generator with AdaIN and Mapping Network
+experiment:
+  name: "stylegan_adain_celeba64"
+  exp_dir: "experiments/stylegan_adain"
+
+model:
+  type: "stylegan"
+  latent_dim: 512
+  style_dim: 512
+  num_mapping_layers: 8
+  img_channels: 3
+  img_size: 64
+  base_channels: 512
+  max_channels: 512
+  use_attention: false
+  use_minibatch_std: true
+  use_spectral_norm: false
+
+data:
+  dataset_path: "data/celeba/img_align_celeba"
+  use_synthetic: false
+  synthetic_samples: 1000
+  img_size: 64
+  batch_size: 32
+  num_workers: 2
+
+training:
+  total_steps: 40000
+  lr_g: 0.0001
+  lr_d: 0.0001
+  beta1: 0.0
+  beta2: 0.99
+  n_critic: 4
+  loss_mode: "wgan_gp"
+  penalty_weight: 10.0
+  style_mixing_prob: 0.3
+  ema_decay: 0.999
+  amp: true
+  sample_every: 250
+  checkpoint_every: 1000

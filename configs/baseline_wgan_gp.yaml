@@ -1,0 +1,36 @@
+# Baseline WGAN-GP configuration on CelebA 64x64
+experiment:
+  name: "baseline_wgan_gp_celeba64"
+  exp_dir: "experiments/baseline_wgan_gp"
+
+model:
+  type: "wgan_baseline"
+  latent_dim: 128
+  img_channels: 3
+  img_size: 64
+  feature_dim: 64
+  use_attention: false
+  use_spectral_norm: false
+
+data:
+  dataset_path: "data/celeba/img_align_celeba"
+  use_synthetic: false
+  synthetic_samples: 500
+  img_size: 64
+  batch_size: 64
+  num_workers: 2
+
+training:
+  total_steps: 25000
+  lr_g: 0.0002
+  lr_d: 0.0002
+  beta1: 0.0
+  beta2: 0.9
+  n_critic: 5
+  loss_mode: "wgan_gp"
+  penalty_weight: 10.0
+  style_mixing_prob: 0.0
+  ema_decay: 0.999
+  amp: true
+  sample_every: 250
+  checkpoint_every: 1000

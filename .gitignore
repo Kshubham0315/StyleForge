@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# StyleForge specific
+experiments/**/checkpoints/*.pt
+experiments/**/samples/*.png
+outputs/*.png
+data/celeba/img_align_celeba/
