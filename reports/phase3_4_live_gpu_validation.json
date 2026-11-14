@@ -1,0 +1,79 @@
+{
+  "hardware": {
+    "cuda_available": true,
+    "device_name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "total_vram_mb": 6140.5
+  },
+  "health_check": {
+    "status_code": 200,
+    "data": {
+      "status": "healthy",
+      "uptime_seconds": 1.45,
+      "version": "2.0.0",
+      "device": "cuda",
+      "cuda_available": true,
+      "database_connected": true,
+      "models_loaded": true
+    },
+    "models_loaded": true,
+    "device": "cuda"
+  },
+  "swagger_docs": {
+    "docs_status_code": 200,
+    "openapi_status_code": 200,
+    "endpoints_count": 13,
+    "has_generate": true,
+    "has_interpolate": true,
+    "has_mix_styles": true
+  },
+  "metrics": {
+    "metrics_status_code": 200,
+    "api_v1_metrics_status_code": 200,
+    "has_active_inferences": true,
+    "has_generated_faces": false
+  },
+  "live_standard_generation": {
+    "status_code": 200,
+    "total_api_latency_ms": 320.41,
+    "model_inference_latency_ms": 243.83,
+    "api_overhead_ms": 76.58,
+    "vram_before_mb": 111.91,
+    "vram_peak_mb": 139.06,
+    "vram_after_mb": 120.03,
+    "file_size_bytes": 8815,
+    "image_dimensions": "64x64",
+    "image_format": "PNG",
+    "decoded_successfully": true,
+    "saved_path": "artifacts\\independent_validation\\live_standard_seed42.png"
+  },
+  "live_smooth_generation": {
+    "status_code": 200,
+    "total_api_latency_ms": 25.87,
+    "model_inference_latency_ms": 9.66,
+    "api_overhead_ms": 16.21,
+    "file_size_bytes": 7620,
+    "image_dimensions": "64x64",
+    "image_format": "PNG",
+    "decoded_successfully": true,
+    "l1_diff_from_standard": 5.03,
+    "saved_path": "artifacts\\independent_validation\\live_smooth_seed42.png"
+  },
+  "seed_reproducibility": {
+    "seed": 42,
+    "is_bit_identical": true,
+    "max_pixel_diff": 0.0
+  },
+  "tensor_audit": {
+    "min": -1.0,
+    "max": 1.0,
+    "shape": [
+      2,
+      3,
+      64,
+      64
+    ],
+    "has_nan": false,
+    "has_inf": false,
+    "range_valid": true
+  }
+}

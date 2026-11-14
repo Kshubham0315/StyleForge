@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+frontend/node_modules
+frontend/dist
+dist
+.git
+.gitignore
+__pycache__
+**/*.pyc
+venv
+.venv
+*.pt
+!checkpoints/styleforge_final_model.pt
+data/artifacts

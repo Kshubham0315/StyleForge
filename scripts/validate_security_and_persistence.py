@@ -211,6 +211,7 @@ def run_security_and_persistence_tests() -> dict:
 
 if __name__ == "__main__":
     res = run_security_and_persistence_tests()
-    with open("reports/phase5_security_validation.json", "w") as f:
+    out_file = "reports/independent_security_validation.json"
+    with open(out_file, "w") as f:
         json.dump(res, f, indent=2)
-    print("Saved report to reports/phase5_security_validation.json")
+    print(f"Saved report to {out_file}")

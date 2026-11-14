@@ -144,9 +144,10 @@ def run_full_load_test() -> Dict[str, Any]:
         "tiers": benchmarks,
     }
 
-    with open("reports/load_test_results.json", "w") as f:
+    output_path = "reports/independent_load_test_results.json"
+    with open(output_path, "w") as f:
         json.dump(overall, f, indent=2)
-    print("\nSaved load test metrics to reports/load_test_results.json")
+    print(f"\nSaved independent load test metrics to {output_path}")
     return overall
 
 

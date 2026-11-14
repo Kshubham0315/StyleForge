@@ -7,8 +7,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Enable pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Enable pnpm v10 (aligned with host and CI workflows)
+RUN corepack enable && corepack prepare pnpm@10 --activate
 
 COPY frontend/package.json frontend/pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile || pnpm install
