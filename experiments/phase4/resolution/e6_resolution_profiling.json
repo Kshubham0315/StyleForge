@@ -1,0 +1,52 @@
+[
+  {
+    "status": "SUCCESS",
+    "img_size": 64,
+    "batch_size": 16,
+    "peak_vram_gb": 1.1476812362670898,
+    "headroom_gb": 4.84890079498291,
+    "total_vram_gb": 5.99658203125,
+    "step_time_ms": 577.8887271881104,
+    "fits_in_memory": true
+  },
+  {
+    "status": "SUCCESS",
+    "img_size": 64,
+    "batch_size": 32,
+    "peak_vram_gb": 2.071915626525879,
+    "headroom_gb": 3.924666404724121,
+    "total_vram_gb": 5.99658203125,
+    "step_time_ms": 559.2963695526123,
+    "fits_in_memory": true
+  },
+  {
+    "status": "SUCCESS",
+    "img_size": 128,
+    "batch_size": 4,
+    "peak_vram_gb": 1.0501813888549805,
+    "headroom_gb": 4.9464006423950195,
+    "total_vram_gb": 5.99658203125,
+    "step_time_ms": 350.08764266967773,
+    "fits_in_memory": true
+  },
+  {
+    "status": "SUCCESS",
+    "img_size": 128,
+    "batch_size": 8,
+    "peak_vram_gb": 1.8441500663757324,
+    "headroom_gb": 4.152431964874268,
+    "total_vram_gb": 5.99658203125,
+    "step_time_ms": 565.1741027832031,
+    "fits_in_memory": true
+  },
+  {
+    "status": "SUCCESS",
+    "img_size": 128,
+    "batch_size": 16,
+    "peak_vram_gb": 3.410010814666748,
+    "headroom_gb": 2.586571216583252,
+    "total_vram_gb": 5.99658203125,
+    "step_time_ms": 1008.2967281341553,
+    "fits_in_memory": true
+  }
+]

@@ -71,6 +71,14 @@ def test_gan_loss_modes():
     assert g_loss_r1.ndim == 0
     assert "penalty" in d_stats_r1
 
+    # Pure unregularized logistic mode
+    loss_log = GANLoss(mode="logistic", penalty_weight=0.0)
+    d_loss_log, d_stats_log = loss_log.critic_loss(critic, real, fake)
+    g_loss_log, g_stats_log = loss_log.generator_loss(critic, fake)
+    assert d_loss_log.ndim == 0
+    assert g_loss_log.ndim == 0
+    assert d_stats_log["penalty"] == 0.0
+
     # Combined WGAN-GP + R1 ablation mode
     loss_comb = GANLoss(mode="wgan_gp_r1")
     d_loss_comb, d_stats_comb = loss_comb.critic_loss(critic, real, fake)

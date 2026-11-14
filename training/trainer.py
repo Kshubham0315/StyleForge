@@ -37,21 +37,113 @@ def get_git_commit_hash() -> str:
 
 
 class ExponentialMovingAverage:
-    """Maintains an exponential moving average of model parameters and buffers."""
+    """Maintains an exponential moving average of model parameters and buffers.
 
-    def __init__(self, model: nn.Module, decay: float = 0.999):
-        self.decay = decay
+    Supports:
+    - Standard exponential decay: theta_ema = beta * theta_ema + (1 - beta) * theta
+    - Initialization modes:
+        * 'model': Initialized to initial generator weights theta^(0)
+        * 'zero': Initialized to zero tensors
+    - Mathematical bias correction:
+        * For 'model' init: theta_debiased = (theta_shadow - beta^t * theta^(0)) / (1 - beta^t)
+        * For 'zero' init:  theta_debiased = theta_shadow / (1 - beta^t)
+    - Warm-up scheduling:
+        * beta(t) = min(beta, (1 + t) / (10 + t)) or step-based warmup
+    - Update counter tracking and full state checkpoint serialization
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        decay: float = 0.999,
+        use_warmup: bool = False,
+        bias_correction: bool = False,
+        init_mode: str = "model",
+    ):
+        self.decay = float(decay)
+        self.use_warmup = use_warmup
+        self.bias_correction = bias_correction
+        self.init_mode = init_mode.lower()
+        self.num_updates = 0
+
         self.shadow = copy.deepcopy(model).eval()
         for param in self.shadow.parameters():
             param.requires_grad = False
 
+        if self.init_mode == "zero":
+            for param in self.shadow.parameters():
+                param.data.zero_()
+            self.initial_params = None
+        else:
+            # Save clone of initial parameters for exact debiasing if requested
+            self.initial_params = [p.clone().detach().cpu() for p in model.parameters()]
+
+    def get_effective_decay(self) -> float:
+        """Computes effective decay factor, taking into account warm-up scheduling."""
+        if not self.use_warmup or self.num_updates == 0:
+            return self.decay
+        # Canonical StyleGAN / PyTorch AveragedModel warmup schedule
+        warmup_decay = (1.0 + self.num_updates) / (10.0 + self.num_updates)
+        return min(self.decay, warmup_decay)
+
     @torch.no_grad()
     def update(self, model: nn.Module):
+        """Updates shadow weights and buffers with effective decay."""
+        self.num_updates += 1
+        beta = self.get_effective_decay()
+
         for s_param, m_param in zip(self.shadow.parameters(), model.parameters()):
-            s_param.data.mul_(self.decay).add_(m_param.data, alpha=1.0 - self.decay)
+            s_param.data.mul_(beta).add_(m_param.data, alpha=1.0 - beta)
 
         for s_buffer, m_buffer in zip(self.shadow.buffers(), model.buffers()):
             s_buffer.copy_(m_buffer)
+
+    @torch.no_grad()
+    def get_debiased_shadow(self, target_model: Optional[nn.Module] = None) -> nn.Module:
+        """Returns a generator module with bias-corrected weights applied."""
+        out_model = copy.deepcopy(target_model if target_model is not None else self.shadow).eval()
+        if self.num_updates == 0 or not self.bias_correction:
+            out_model.load_state_dict(self.shadow.state_dict())
+            return out_model
+
+        beta_t = self.decay ** self.num_updates
+        correction_factor = max(1e-7, 1.0 - beta_t)
+
+        out_params = list(out_model.parameters())
+        shadow_params = list(self.shadow.parameters())
+
+        if self.init_mode == "zero":
+            for o_param, s_param in zip(out_params, shadow_params):
+                o_param.data.copy_(s_param.data / correction_factor)
+        else:
+            for i, (o_param, s_param) in enumerate(zip(out_params, shadow_params)):
+                init_p = self.initial_params[i].to(s_param.device)
+                # theta_debiased = (theta_shadow - beta^t * theta^(0)) / (1 - beta^t)
+                debiased = (s_param.data - beta_t * init_p) / correction_factor
+                o_param.data.copy_(debiased)
+
+        for o_buffer, s_buffer in zip(out_model.buffers(), self.shadow.buffers()):
+            o_buffer.copy_(s_buffer)
+
+        return out_model
+
+    def get_metadata(self) -> Dict[str, Any]:
+        """Returns metadata for checkpoint serialization."""
+        return {
+            "decay": self.decay,
+            "num_updates": self.num_updates,
+            "use_warmup": self.use_warmup,
+            "bias_correction": self.bias_correction,
+            "init_mode": self.init_mode,
+        }
+
+    def load_metadata(self, meta: Dict[str, Any]):
+        """Restores metadata from checkpoint."""
+        self.decay = meta.get("decay", self.decay)
+        self.num_updates = meta.get("num_updates", self.num_updates)
+        self.use_warmup = meta.get("use_warmup", self.use_warmup)
+        self.bias_correction = meta.get("bias_correction", self.bias_correction)
+        self.init_mode = meta.get("init_mode", self.init_mode)
 
 
 class GANTrainer:
@@ -73,8 +165,18 @@ class GANTrainer:
         self.critic = critic.to(self.device)
 
         # EMA generator
-        ema_decay = float(config.get("training", {}).get("ema_decay", 0.999))
-        self.ema_generator = ExponentialMovingAverage(self.generator, decay=ema_decay)
+        t_cfg = config.get("training", {})
+        ema_decay = float(t_cfg.get("ema_decay", 0.999))
+        ema_warmup = bool(t_cfg.get("ema_warmup", False))
+        ema_bias_corr = bool(t_cfg.get("ema_bias_correction", False))
+        ema_init_mode = str(t_cfg.get("ema_init_mode", "model"))
+        self.ema_generator = ExponentialMovingAverage(
+            self.generator,
+            decay=ema_decay,
+            use_warmup=ema_warmup,
+            bias_correction=ema_bias_corr,
+            init_mode=ema_init_mode,
+        )
 
         # Optimizers
         lr_g = float(config.get("training", {}).get("lr_g", 0.0002))
@@ -146,6 +248,7 @@ class GANTrainer:
             "generator": self.generator.state_dict(),
             "critic": self.critic.state_dict(),
             "ema_generator": self.ema_generator.shadow.state_dict(),
+            "ema_metadata": self.ema_generator.get_metadata(),
             "opt_g": self.opt_g.state_dict(),
             "opt_d": self.opt_d.state_dict(),
             "config": self.config,
@@ -160,7 +263,12 @@ class GANTrainer:
         state = torch.load(ckpt_path, map_location=self.device, weights_only=False)
         self.generator.load_state_dict(state["generator"])
         self.critic.load_state_dict(state["critic"])
-        self.ema_generator.shadow.load_state_dict(state["ema_generator"])
+        if "ema_generator" in state:
+            self.ema_generator.shadow.load_state_dict(state["ema_generator"])
+        if "ema_metadata" in state:
+            self.ema_generator.load_metadata(state["ema_metadata"])
+        else:
+            self.ema_generator.num_updates = state.get("global_step", 0)
         self.opt_g.load_state_dict(state["opt_g"])
         self.opt_d.load_state_dict(state["opt_d"])
         self.global_step = state["global_step"]
@@ -175,9 +283,10 @@ class GANTrainer:
 
     @torch.no_grad()
     def save_sample_grid(self, step: int):
-        """Generate and save image grid using EMA generator."""
-        self.ema_generator.shadow.eval()
-        fake = self.ema_generator.shadow(self.fixed_z)
+        """Generate and save image grid using debiased EMA generator."""
+        eval_gen = self.ema_generator.get_debiased_shadow()
+        eval_gen.eval()
+        fake = eval_gen(self.fixed_z)
         # Unnormalize [-1, 1] to [0, 1]
         fake = (fake * 0.5 + 0.5).clamp(0.0, 1.0)
         grid_path = self.samples_dir / f"step_{step:06d}.png"

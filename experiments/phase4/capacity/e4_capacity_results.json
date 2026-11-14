@@ -1,0 +1,24 @@
+[
+  {
+    "config_name": "Standard Capacity (Base=64)",
+    "gen_base_channels": 512,
+    "critic_base_channels": 64,
+    "g_params": 14535875,
+    "d_params": 12174721,
+    "total_params": 26710596,
+    "peak_vram_gb": 1.4216279983520508,
+    "step_latency_ms": 481.38206799825036,
+    "fid": 390.9560241699219
+  },
+  {
+    "config_name": "Scaled Critic Capacity (Base=128)",
+    "gen_base_channels": 512,
+    "critic_base_channels": 128,
+    "g_params": 14535875,
+    "d_params": 16927489,
+    "total_params": 31463364,
+    "peak_vram_gb": 2.2845053672790527,
+    "step_latency_ms": 1060.3991444905598,
+    "fid": 393.7750549316406
+  }
+]

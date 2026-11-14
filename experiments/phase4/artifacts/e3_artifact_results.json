@@ -1,0 +1,54 @@
+{
+  "metadata": {
+    "experiment": "Phase 4 E3 Water-Droplet & Spectral Analysis",
+    "device": "cuda",
+    "num_real_evaluated": 384,
+    "num_fake_evaluated": 384
+  },
+  "fft_metrics": {
+    "real_hf_ratio": 0.00044996133263653477,
+    "fake_hf_ratio": 0.0010895235803573455
+  },
+  "spatial_spikes": {
+    "res_4": {
+      "spatial_dim": "4x4",
+      "channels": 512,
+      "peak_to_mean_ratio": 22.790443420410156,
+      "max_z_score": 2.0697710514068604,
+      "corner_domination_prob": 0.22442626953125
+    },
+    "res_8": {
+      "spatial_dim": "8x8",
+      "channels": 512,
+      "peak_to_mean_ratio": 27.69127655029297,
+      "max_z_score": 2.7138636112213135,
+      "corner_domination_prob": 0.10150146484375
+    },
+    "res_16": {
+      "spatial_dim": "16x16",
+      "channels": 256,
+      "peak_to_mean_ratio": 27.39027214050293,
+      "max_z_score": 3.0952863693237305,
+      "corner_domination_prob": 0.0648193359375
+    },
+    "res_32": {
+      "spatial_dim": "32x32",
+      "channels": 128,
+      "peak_to_mean_ratio": 39.319034576416016,
+      "max_z_score": 3.618755578994751,
+      "corner_domination_prob": 0.031982421875
+    },
+    "res_64": {
+      "spatial_dim": "64x64",
+      "channels": 64,
+      "peak_to_mean_ratio": 25.38909912109375,
+      "max_z_score": 3.7270355224609375,
+      "corner_domination_prob": 0.0263671875
+    }
+  },
+  "upsampling_ablation": {
+    "bilinear_hf_ratio": 0.04782970099923035,
+    "nearest_conv_hf_ratio": 0.19635648281363874,
+    "anti_aliased_hf_ratio": 0.013750638092905092
+  }
+}

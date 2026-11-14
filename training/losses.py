@@ -102,7 +102,7 @@ class GANLoss(nn.Module):
         self.penalty_weight = penalty_weight
         self.r1_gamma = r1_gamma
 
-        valid_modes = ("wgan_gp", "r1", "logistic", "wgan_gp_r1")
+        valid_modes = ("wgan_gp", "r1", "logistic", "logistic_r1", "wgan_gp_r1")
         if self.mode not in valid_modes:
             raise ValueError(f"Unknown loss mode: {mode}. Choose one of {valid_modes}")
 
@@ -134,18 +134,32 @@ class GANLoss(nn.Module):
             stats["penalty"] = gp.item()
             stats["grad_norm"] = grad_norm.item()
 
-        elif self.mode in ("r1", "logistic"):
+        elif self.mode in ("r1", "logistic", "logistic_r1"):
             # Non-saturating logistic loss
             loss_real = F.softplus(-real_scores).mean()
             loss_fake = F.softplus(fake_scores).mean()
             base_loss = loss_real + loss_fake
-            r1, grad_norm = compute_r1_penalty(
-                critic, real_images, r1_gamma=self.penalty_weight
-            )
-            total_loss = base_loss + r1
+            gamma = self.penalty_weight if self.mode != "logistic" else self.penalty_weight
+            if gamma > 0.0 and self.mode in ("r1", "logistic_r1"):
+                r1, grad_norm = compute_r1_penalty(
+                    critic, real_images, r1_gamma=gamma
+                )
+                total_loss = base_loss + r1
+                stats["penalty"] = r1.item()
+                stats["grad_norm"] = grad_norm.item()
+            elif self.mode == "logistic" and self.penalty_weight > 0.0:
+                # If explicit penalty_weight given to logistic mode
+                r1, grad_norm = compute_r1_penalty(
+                    critic, real_images, r1_gamma=self.penalty_weight
+                )
+                total_loss = base_loss + r1
+                stats["penalty"] = r1.item()
+                stats["grad_norm"] = grad_norm.item()
+            else:
+                total_loss = base_loss
+                stats["penalty"] = 0.0
+                stats["grad_norm"] = 0.0
             stats["base_loss"] = base_loss.item()
-            stats["penalty"] = r1.item()
-            stats["grad_norm"] = grad_norm.item()
 
         elif self.mode == "wgan_gp_r1":
             base_loss = fake_scores.mean() - real_scores.mean()
@@ -174,7 +188,7 @@ class GANLoss(nn.Module):
 
         if self.mode in ("wgan_gp", "wgan_gp_r1"):
             loss = -fake_scores.mean()
-        elif self.mode in ("r1", "logistic"):
+        elif self.mode in ("r1", "logistic", "logistic_r1"):
             loss = F.softplus(-fake_scores).mean()
 
         stats = {

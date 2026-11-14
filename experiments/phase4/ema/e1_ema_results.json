@@ -1,0 +1,62 @@
+[
+  {
+    "condition": "Raw Instantaneous",
+    "fid": 381.75335693359375,
+    "kid_mean": 0.5170879364013672,
+    "kid_std": 0.01901651732623577,
+    "precision": 0.0,
+    "recall": 0.0,
+    "pairwise_l1": 0.6354620456695557,
+    "batch_variance": 0.3687678873538971
+  },
+  {
+    "condition": "Standard EMA 0.999 (Uncorrected)",
+    "fid": 419.31829833984375,
+    "kid_mean": 0.6183518767356873,
+    "kid_std": 0.018557647243142128,
+    "precision": 0.0,
+    "recall": 0.0,
+    "pairwise_l1": 0.7157935500144958,
+    "batch_variance": 0.43513378500938416
+  },
+  {
+    "condition": "Debiased EMA 0.999 (Model-Init)",
+    "fid": 404.2421875,
+    "kid_mean": 0.574268102645874,
+    "kid_std": 0.019435837864875793,
+    "precision": 0.0,
+    "recall": 0.0,
+    "pairwise_l1": 0.6665562987327576,
+    "batch_variance": 0.39945003390312195
+  },
+  {
+    "condition": "Debiased EMA 0.999 (Zero-Init)",
+    "fid": 404.33642578125,
+    "kid_mean": 0.5744513869285583,
+    "kid_std": 0.01933070458471775,
+    "precision": 0.0,
+    "recall": 0.0,
+    "pairwise_l1": 0.6663460731506348,
+    "batch_variance": 0.3993113934993744
+  },
+  {
+    "condition": "Warmup EMA 0.999 (Scheduled)",
+    "fid": 383.0124206542969,
+    "kid_mean": 0.5181366205215454,
+    "kid_std": 0.017235148698091507,
+    "precision": 0.0,
+    "recall": 0.0,
+    "pairwise_l1": 0.6419370174407959,
+    "batch_variance": 0.3761095702648163
+  },
+  {
+    "condition": "Warmup EMA 0.990 (Scheduled)",
+    "fid": 383.0124206542969,
+    "kid_mean": 0.5181366205215454,
+    "kid_std": 0.017235148698091507,
+    "precision": 0.0,
+    "recall": 0.0,
+    "pairwise_l1": 0.6419370174407959,
+    "batch_variance": 0.3761095702648163
+  }
+]
