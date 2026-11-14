@@ -24,9 +24,9 @@ def test_split_manifests_exist_and_disjoint():
     with open(test_manifest, "r") as f:
         test_data = json.load(f)
 
-    train_set = set(train_data["images"])
-    val_set = set(val_data["images"])
-    test_set = set(test_data["images"])
+    train_set = set(train_data if isinstance(train_data, list) else train_data.get("images", []))
+    val_set = set(val_data if isinstance(val_data, list) else val_data.get("images", []))
+    test_set = set(test_data if isinstance(test_data, list) else test_data.get("images", []))
 
     # Strict disjointness: No image may appear in more than one partition
     assert len(train_set.intersection(val_set)) == 0, "Train and Val splits overlap!"
