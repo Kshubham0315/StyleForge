@@ -1,145 +1,320 @@
-# StyleForge Phase 4: Master Engineering & Research Report
-## Architecture Optimization, Adversarial Objectives & Generalization
+# StyleForge — Phase 4 Final Research Report
+## Architecture Optimization & Generalization
 
-**Author / Lead:** Senior Generative AI Research Engineer, GAN Architect, PyTorch Specialist  
-**Project:** StyleForge (Style-Based Generative Adversarial Network for Facial Synthesis)  
-**Date:** November 14, 2026  
-**Hardware Environment:** NVIDIA GeForce RTX 4050 Laptop GPU (6.00 GB VRAM, Ada Lovelace), 16 GB DDR5 RAM, Windows 11  
-**Software Environment:** PyTorch 2.5.1 + CUDA 12.1, Python 3.10.8  
-**Repository:** [https://github.com/Kshubham0315/StyleForge.git](https://github.com/Kshubham0315/StyleForge.git)  
-
----
-
-## Executive Summary
-
-Phase 4 of **StyleForge** establishes research-grade validation, architectural stabilization, and multi-seed scientific rigor for the StyleGAN-inspired facial generation engine. Building on the foundation of Phases 1–3, Phase 4 addresses critical architectural questions:
-1. **EMA Bias Correction:** Proved mathematically and empirically that dynamic warmup scheduling ($\beta(t) = \min(\beta, \frac{1+t}{10+t})$) eliminates early weight lag and cuts **$36.31$ FID points** from standard uncorrected EMA.
-2. **Multi-Seed Objective Comparison:** Conducted a rigorous 3-seed benchmark ($\{42, 123, 777\}$) across three loss paradigms: WGAN-GP ($\lambda=10.0$), Unregularized Logistic Loss, and Logistic + $R_1$ ($\gamma=10.0$). Results demonstrate that $R_1$ regularization stabilizes non-saturating logistic loss ($\sigma_\text{FID} = 12.13$ vs $18.22$) and outperforms WGAN-GP by **$\sim 20$ FID points** ($374.54$ vs $394.25$).
-3. **Water-Droplet & Spectral Decomposition:** Isolated the mechanism of StyleGAN localized droplet artifacts via layer-wise spatial activation profiling (peak-to-mean activation ratios reaching $39.32$ at $32\times 32$), and demonstrated that anti-aliased low-pass FIR filtering reduces high-frequency aliasing by **$71.1\%$**.
-4. **Capacity & Resource Optimization:** Discovered that doubling critic base channels from 64 to 128 increases step latency by $+120.3\%$ and peak VRAM by $+60.6\%$ without improving FID, certifying `base_channels = 64` as the Pareto-optimal configuration on 6GB VRAM.
-5. **128×128 Scaling Feasibility:** Certified that direct $128\times 128$ training on 6GB VRAM operates comfortably with $1.84\text{ GB}$ peak VRAM at batch size 8 ($4.15\text{ GB}$ headroom) and $3.41\text{ GB}$ at batch size 16 ($2.59\text{ GB}$ headroom).
-6. **Generalization & Memorization Audit:** Verified $100\%$ split disjointness across 6,140 CelebA images (0 hash collisions) and established that synthetic faces are statistically equidistant from training and unseen test sets in both raw pixel space (ratio $0.9806$) and deep Inception feature space (ratio $0.9996$).
+**Project:** StyleForge  
+**Phase:** 04  
+**Status:** Experimental execution reported complete  
+**Research Domain:** Generative Adversarial Networks (GANs)  
+**Framework:** PyTorch  
+**Dataset:** CelebA  
+**Target Resolution:** 64×64  
+**Hardware:** NVIDIA RTX 4050 Laptop GPU (6GB VRAM)  
+**Git Commit:** `0adcd57`
 
 ---
 
-## Master Benchmark Summary Table
+# 1. Executive Summary
 
-All metrics evaluated against authentic CelebA validation images ($N=614$, $64\times 64$):
+Phase 4 focused on improving StyleForge's generative quality, training stability, architectural efficiency, and generalization.
 
-| Experiment / Milestone | Configuration | FID ↓ | KID $\times 10^3$ ↓ | L1 Diversity ↑ | Batch Variance ↑ | Peak VRAM | Status |
-|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **E1: Raw Instantaneous** | Instantaneous weights | $381.75$ | $517.1$ | $0.6355$ | $0.36877$ | $1.42\text{ GB}$ | Verified |
-| **E1: Uncorrected EMA** | $\beta = 0.999$, static | $419.32$ | $618.4$ | $0.7158$ | $0.43513$ | $1.42\text{ GB}$ | Inertia Lag |
-| **E1: Debiased EMA** | Model-init debiased | $404.24$ | $574.3$ | $0.6666$ | $0.39945$ | $1.42\text{ GB}$ | Exact Equiv. |
-| **E1: Warmup EMA (Best)** | Dynamic warmup schedule | $\mathbf{383.01}$ | $\mathbf{518.1}$ | $0.6419$ | $0.37611$ | $1.42\text{ GB}$ | **-36.3 pts vs uncorr.** |
-| **E2: WGAN-GP** | Multi-seed ($N=3$) | $394.25 \pm 6.86$ | $552.5 \pm 13.3$ | $\mathbf{0.6499 \pm 0.020}$ | $\mathbf{0.39957 \pm 0.011}$ | $1.42\text{ GB}$ | Highly Robust |
-| **E2: Logistic (Unreg.)** | Multi-seed ($N=3$) | $\mathbf{369.06 \pm 18.22}$ | $\mathbf{491.9 \pm 37.6}$ | $0.3924 \pm 0.133$ | $0.21875 \pm 0.093$ | $1.08\text{ GB}$ | High Variance |
-| **E2: Logistic + $R_1$** | Multi-seed ($N=3$) | $374.54 \pm 12.13$ | $505.2 \pm 26.9$ | $0.4227 \pm 0.150$ | $0.23783 \pm 0.107$ | $1.42\text{ GB}$ | **Optimal Balance** |
-| **E4: Scaled Critic** | Base channels 128 | $393.78$ | $551.0$ | $0.6450$ | $0.39100$ | $2.28\text{ GB}$ | $+120\%$ latency |
-| **E6: 128×128 (bs=8)** | 128×128 Resolution | — | — | — | — | $1.84\text{ GB}$ | $4.15\text{ GB}$ headroom |
-| **E6: 128×128 (bs=16)** | 128×128 Resolution | — | — | — | — | $3.41\text{ GB}$ | $2.59\text{ GB}$ headroom |
-| **E7: Gen. Audit** | Nearest-Neighbor Probe | — | — | Ratio: $0.9806$ | Ratio: $0.9996$ | — | **No Memorization** |
+Seven experiments (E1–E7) were executed to investigate:
 
----
+- EMA initialization bias and warm-up scheduling.
+- GAN objective optimization through multi-seed experiments.
+- Water-droplet artifacts and frequency-domain abnormalities.
+- Generator and Critic capacity scaling.
+- 64×64 facial synthesis quality.
+- 128×128 resolution feasibility.
+- Dataset leakage and memorization.
 
-## Detailed Experimental Chapters
+The reported results provide useful experimental evidence for several architectural and training decisions.
 
-### Experiment E1: Systematic EMA Bias Correction & Scheduling
+The most important outcome is that StyleForge now has a more evidence-driven training configuration rather than relying exclusively on individual FID improvements.
 
-#### Scientific Objective
-In early training iterations ($t < 1,000$), standard EMA ($\theta_t = \beta \theta_{t-1} + (1-\beta) \theta$) retains substantial inertia from initial random weights:
-$$\theta_t = \beta^t \theta_0 + (1-\beta) \sum_{i=1}^t \beta^{t-i} \theta_i$$
-At step 300 with $\beta=0.999$, $\beta^{300} = 0.741$, meaning $74.1\%$ of the parameter values still reflect initial random weights.
+# 2. Master Benchmark Results
 
-#### Methods & Findings
-We implemented:
-1. **Model-init debiasing:** $\theta_\text{debiased} = \frac{\theta_t - \beta^t \theta_0}{1 - \beta^t}$
-2. **Zero-init debiasing:** $\theta_\text{debiased} = \frac{\theta_t}{1 - \beta^t}$
-3. **Dynamic warmup schedule:** $\beta(t) = \min\left(\beta, \frac{1+t}{10+t}\right)$
+All reported 64×64 validation FID and KID measurements used 614 real CelebA validation images and 614 generated images.
 
-```
-Standard EMA (0.999): FID = 419.32
-Debiased Model-Init:  FID = 404.24 (-15.08 pts)
-Debiased Zero-Init:   FID = 404.34 (Exact mathematical equivalence)
-Warmup EMA Scheduled: FID = 383.01 (-36.31 pts)
-Raw Instantaneous:    FID = 381.75
-```
-**Conclusion:** Dynamic warmup scheduling eliminates parameter lag, enabling EMA weights to track the active generator trajectory during early training while preserving variance attenuation.
+| Experiment | Configuration | FID ↓ | KID × 10³ ↓ |
+|---|---|---:|---:|
+| E1 | Raw Generator | 381.75 | 517.1 |
+| E1 | Standard EMA | 419.32 | 618.4 |
+| E1 | Debiased EMA | 404.24 | 574.3 |
+| E1 | Warm-up EMA | 383.01 | 518.1 |
+| E2 | WGAN-GP | 394.25 ± 6.86 | 552.5 ± 13.3 |
+| E2 | Logistic | 369.06 ± 18.22 | 491.9 ± 37.6 |
+| E2 | Logistic + R1 | 374.54 ± 12.13 | 505.2 ± 26.9 |
 
----
+Additional engineering measurements:
 
-### Experiment E2: Multi-Seed Objective Comparison
+- Peak reported VRAM: 3.57 GB in Phase 3.
+- E1 peak VRAM: 1.42 GB.
+- E4 scaled architecture peak VRAM: 2.28 GB.
+- E6 128×128 batch-size-16 profiling: 3.41 GB.
+- Automated tests: 36/36 passed.
 
-#### Scientific Objective
-Previous observations of $R_1$ superiority were based on single-seed comparisons. E2 deployed a balanced 3-seed benchmark across WGAN-GP ($\lambda=10.0$), unregularized logistic loss, and logistic loss with $R_1$ regularization ($\gamma=10.0$).
+> [!NOTE]
+> The Phase 3 FID of 297.76 and Phase 4 measurements are not automatically comparable. They must be treated as results from separate experimental configurations unless their training checkpoints, evaluation implementation, preprocessing, and sampling protocols are verified to be identical.
 
-#### Results
-- **WGAN-GP:** Yielded the lowest variance across random seeds ($\sigma_\text{FID} = 6.86$), demonstrating exceptional resilience to weight initialization, but converged more slowly ($394.25$ mean FID).
-- **Unregularized Logistic:** Achieved low raw FID ($369.06$), but suffered from high seed instability ($\sigma = 18.22$) and severe diversity loss on seed 777 ($L_1 = 0.2266$, batch variance $= 0.10574$), signaling incipient mode collapse.
-- **Logistic + $R_1$:** $R_1$ gradient regularization prevented mode collapse, dampened seed variance ($\sigma = 12.13$), and maintained a $\sim 20$-point FID lead over WGAN-GP ($374.54$ vs $394.25$).
+# 3. Experiment E1 — EMA Initialization & Optimization
 
----
+## Objective
 
-### Experiment E3: Water-Droplet & Spectral Decomposition
+Investigate the influence of EMA initialization bias and determine whether dynamic warm-up scheduling improves generator weight averaging.
 
-#### Key Insights
-- **AdaIN Droplet Mechanism:** Spatial activation profiling revealed that peak-to-mean activation ratios climb from $22.79$ at $4\times 4$ to $39.32$ at $32\times 32$. Maximum pixel activations reach **$3.73\sigma$** above the spatial mean, with early layers showing high corner concentration ($22.4\%$ of channels at $4\times 4$). This confirms that the generator creates localized outlier spikes to control the spatial variance divisor in AdaIN.
-- **Upsampling Aliasing:** Nearest-neighbor upsampling + convolution exhibits a high-frequency energy ratio of $0.1964$ ($+311\%$ over bilinear). Implementing an anti-aliased binomial FIR low-pass filter suppresses high-frequency artifacts to $0.0138$ (a **$71.1\%$ reduction** relative to standard bilinear interpolation).
+The standard EMA update is:
+$$\text{EMA}_t = \beta \text{EMA}_{t-1} + (1 - \beta) \theta_t$$
 
----
+For constant decay and initialization at $\theta_0$, the contribution of initial weights after $t$ updates is proportional to:
+$$\beta^t$$
 
-### Experiment E4 & E5: Architecture Capacity & Resource Scaling
+For $\beta = 0.999$ and $t = 300$:
+$$0.999^{300} \approx 0.7408$$
 
-#### Key Insights
-- Testing base channel capacity ($64$ vs $128$) demonstrated that wide critic architectures ($128$ base channels) increase total parameters by $+17.8\%$ ($31.5\text{M}$ vs $26.7\text{M}$), peak VRAM by $+60.6\%$ ($2.28\text{ GB}$ vs $1.42\text{ GB}$), and per-step latency by **$+120.3\%$** ($1060.4\text{ ms}$ vs $481.4\text{ ms}$).
-- Early validation FID slightly regressed ($393.78$ vs $390.96$) due to critic-generator imbalance. Base channels $= 64$ remains the optimal engineering configuration.
+This means approximately 74.1% of the original EMA initialization remains in the uncorrected EMA state under the standard constant-decay recurrence.
 
----
+## Experimental results
 
-### Experiment E6: 128×128 Progressive Scaling Feasibility
+| EMA strategy | FID |
+|---|---:|
+| Raw Generator | 381.75 |
+| Standard EMA | 419.32 |
+| Debiased EMA | 404.24 |
+| Dynamic Warm-up EMA | 383.01 |
 
-#### Memory Profile Benchmark (6GB VRAM Budget)
-- $64\times 64$ (bs=16): $1.15\text{ GB}$ used, $4.85\text{ GB}$ headroom ($577.9\text{ ms}$)
-- $64\times 64$ (bs=32): $2.07\text{ GB}$ used, $3.92\text{ GB}$ headroom ($559.3\text{ ms}$)
-- $128\times 128$ (bs=4): $1.05\text{ GB}$ used, $4.95\text{ GB}$ headroom ($350.1\text{ ms}$)
-- $128\times 128$ (bs=8): $1.84\text{ GB}$ used, $4.15\text{ GB}$ headroom ($565.2\text{ ms}$) — **Optimal Production Setting**
-- $128\times 128$ (bs=16): $3.41\text{ GB}$ used, $2.59\text{ GB}$ headroom ($1008.3\text{ ms}$)
+## Key findings
 
-**Verdict:** 128×128 synthesis is completely feasible without OOM on 6GB consumer GPUs at batch sizes 8 and 16.
+1. Standard EMA showed substantial lag during early training.
+2. Debiasing reduced the observed FID deterioration.
+3. Dynamic warm-up produced the strongest EMA result among the tested EMA configurations.
+4. Warm-up EMA approached Raw Generator performance.
 
----
+The reported warm-up improvement over standard EMA was:
+$$419.32 - 383.01 = 36.31\text{ FID points}$$
 
-### Experiment E7: Independent Generalization & Memorization Audit
+## Research conclusion
 
-#### Cryptographic Leakage Check
-Exhaustive MD5 hashing of all 6,140 CelebA images confirmed:
-- Train: 4,912 unique hashes
-- Val: 614 unique hashes
-- Test: 614 unique hashes
-- Overlap across all pairs: **$0$ images ($100\%$ disjointness)**.
+EMA decay must be considered relative to training duration and initialization. A large decay value does not necessarily provide better early-stage generator weights.
 
-#### Nearest-Neighbor Probing
-- Pixel $L_2$ Distance: $\frac{d_\text{train}}{d_\text{test}} = \mathbf{0.9806}$ ($81.36$ vs $82.97$)
-- Inception Feature Distance: $\frac{d_\text{train}}{d_\text{test}} = \mathbf{0.9996}$ ($19.23$ vs $19.24$)
-- **Formal Conclusion:** Generated images are statistically equidistant from training and test distributions. No evidence of direct memorization was observed under tested protocols.
+The dynamic warm-up implementation is a promising candidate for future training configurations.
 
----
+> [!IMPORTANT]
+> The warm-up schedule must be documented with its exact per-step decay values and cumulative initialization contribution. A varying decay schedule cannot be analyzed using $\beta^t$ alone.
 
-## Verified Limitations
+# 4. Experiment E2 — Multi-Seed Objective Comparison
 
-1. **Inception Metric Scaling:** Inception-v3 features are trained on $299\times 299$ ImageNet categories. Computing FID at $64\times 64$ introduces an inherent feature domain shift that inflates baseline numbers across all models.
-2. **AdaIN Mathematical Inductive Bias:** While stabilized by warmup EMA and $R_1$, AdaIN inherently encourages spatial outlier spikes. Full architectural resolution requires transitioning to weight demodulation (StyleGAN2).
-3. **Training Duration:** Phase 4 experiments prioritized multi-seed validation, profiling, and controlled ablations (200–300 steps). Full photographic photorealism on CelebA typically requires $25,000$ to $100,000$ steps.
+## Objective
 
----
+Determine whether Logistic + R1 offers a more reliable optimization strategy than WGAN-GP and unregularized Logistic loss.
 
-## Master Architecture Artifact Checklist
+Three random seeds were tested: `42`, `123`, `777`. Each objective was evaluated under the same reported experimental protocol.
 
-- `reports/PHASE4_INITIAL_AUDIT.md`: Pre-flight repository verification.
-- `reports/PHASE4_EMA_ANALYSIS.md`: Complete E1 EMA analysis and proofs.
-- `reports/PHASE4_OBJECTIVE_COMPARISON.md`: Complete E2 multi-seed report.
-- `reports/PHASE4_ARTIFACT_ANALYSIS.md`: Complete E3 2D FFT & spatial activation report.
-- `reports/PHASE4_CAPACITY_ANALYSIS.md`: Complete E4 capacity scaling report.
-- `reports/PHASE4_RESOLUTION_ANALYSIS.md`: Complete E6 128×128 profiling report.
-- `reports/PHASE4_GENERALIZATION_REPORT.md`: Complete E7 generalization audit report.
-- Automated Test Suite: 36/36 tests passing (`pytest tests/`).
+## Results
+
+| Objective | Mean FID ↓ | Standard deviation |
+|---|---:|---:|
+| WGAN-GP | 394.25 | 6.86 |
+| Logistic | 369.06 | 18.22 |
+| Logistic + R1 | 374.54 | 12.13 |
+
+## Analysis
+
+Unregularized Logistic achieved the lowest mean FID. However, its standard deviation was substantially higher.
+
+Adding R1 changed the result:
+- FID standard deviation decreased from 18.22 to 12.13.
+- Mean FID increased by approximately 5.48 points compared with unregularized Logistic.
+- Results showed a potential stability-versus-quality trade-off.
+
+WGAN-GP exhibited the lowest reported FID standard deviation.
+
+## Research conclusion
+
+Logistic + R1 is a promising compromise between mean FID and seed variability. However, the current evidence does not establish it as universally superior. A larger multi-seed study and explicitly defined mode-collapse diagnostics would strengthen this conclusion.
+
+# 5. Experiment E3 — Water-Droplet Artifact Investigation
+
+## Objective
+
+Identify the source of water-droplet-like artifacts in generated facial images.
+
+The investigation examined layer-wise activation distributions, spatial activation outliers, frequency-domain characteristics, upsampling operations, and high-frequency aliasing.
+
+## Activation analysis
+
+Reported observations:
+
+| Feature resolution | Peak-to-mean activation ratio |
+|---|---:|
+| 32×32 | 39.32 |
+| 64×64 | 3.73σ reported activation deviation |
+
+Early feature layers also showed spatial concentration around corner coordinates. The investigation associated these activation patterns with the behavior of AdaIN normalization statistics.
+
+## Anti-aliased filtering experiment
+
+Replacing bilinear upsampling with a 3×3 binomial low-pass FIR filter produced the following reported high-frequency measurements:
+
+| Configuration | High-frequency measurement |
+|---|---:|
+| Bilinear upsampling | 0.0478 |
+| FIR filtering | 0.0138 |
+
+Reported reduction: **71.1%**.
+
+## Research conclusion
+
+Anti-aliased filtering is a promising architectural modification for reducing high-frequency artifacts.
+
+However, a reduction in spectral energy does not automatically establish improved perceptual quality. The next validation should compare:
+- Identical latent samples.
+- Real and generated image spectra.
+- Spatial artifact frequency.
+- FID and perceptual quality.
+- Fine-detail preservation.
+
+The AdaIN activation analysis should be considered a root-cause hypothesis supported by observed correlations until a controlled ablation establishes causality.
+
+# 6. Experiments E4 & E5 — Architecture Capacity Optimization
+
+## Objective
+
+Determine whether increasing Critic capacity improves generative performance sufficiently to justify additional computational costs.
+
+## Results
+
+| Parameter | Standard | Scaled |
+|---|---:|---:|
+| Base channels | 64 | 128 |
+| Total parameters | 26.7M | 31.5M (+17.8%) |
+| Peak VRAM | 1.42 GB | 2.28 GB |
+| Step latency | 481.4 ms | 1060.4 ms |
+| FID | 390.96 | 393.78 |
+
+The scaled configuration increased latency by approximately 120.3%. Reported VRAM consumption increased by approximately 60.6%. FID did not improve.
+
+## Research conclusion
+
+The `base_channels = 64` configuration provides a better measured computational trade-off in this experiment. Increasing Critic capacity without corresponding Generator improvements did not demonstrate a useful benefit. The standard architecture should remain the reference configuration until a controlled experiment demonstrates otherwise.
+
+# 7. Experiment E6 — 128×128 Resolution Feasibility
+
+## Objective
+
+Evaluate whether StyleForge can operate at 128×128 resolution within a 6GB GPU memory budget.
+
+## Profiling results
+
+| Resolution | Batch size | Peak VRAM | Remaining nominal VRAM |
+|---|---:|---:|---:|
+| 128×128 | 8 | 1.84 GB | 4.15 GB |
+| 128×128 | 16 | 3.41 GB | 2.59 GB |
+
+The reported profiling indicates that 128×128 execution is feasible within the available GPU memory budget.
+
+## Research conclusion
+
+StyleForge has a promising path toward higher-resolution facial synthesis on consumer hardware.
+
+However, memory profiling alone does not establish stable 128×128 training, progressive growing effectiveness, improved FID, better facial detail, or generalization at higher resolution. Therefore, 128×128 progressive training remains an experimental research direction rather than a completed quality benchmark.
+
+# 8. Experiment E7 — Independent Generalization & Memorization Audit
+
+## Objective
+
+Investigate dataset leakage and determine whether generated images show evidence of direct training-image memorization.
+
+## Dataset verification
+
+| Dataset split | Images |
+|---|---:|
+| Training | 4,912 |
+| Validation | 614 |
+| Testing | 614 |
+| Total | 6,140 |
+
+MD5-based verification reported zero exact hash overlaps between the three dataset splits. This supports the absence of exact duplicate files across the audited partitions. It does not independently rule out visually similar or near-duplicate images.
+
+## Nearest-neighbor analysis
+
+Reported Train/Test nearest-neighbor distance ratios:
+
+| Feature representation | Train/Test ratio |
+|---|---:|
+| Pixel L2 | 0.9806 |
+| Inception pool3 | 0.9996 |
+
+The ratios were close to 1.0, indicating similar nearest-neighbor distance distributions under the selected representations.
+
+## Research conclusion
+
+No strong evidence of direct training-image memorization was observed under the tested nearest-neighbor protocols.
+
+This is encouraging preliminary generalization evidence. It is not proof that memorization is completely absent. Additional LPIPS-based analysis, feature-space calibration, repeated sampling, and more comprehensive duplicate detection would strengthen the conclusion.
+
+# 9. Engineering & Software Quality
+
+The Phase 4 implementation introduced:
+
+- EMA bias correction and warm-up logic.
+- Multi-seed objective benchmarking.
+- Frequency-domain artifact analysis.
+- Generator and Critic capacity profiling.
+- 128×128 memory profiling.
+- Dataset leakage verification.
+- Nearest-neighbor memorization analysis.
+- Updated experiment documentation.
+
+## Automated testing
+
+Reported regression test result: **36/36 tests passed** (`pytest tests/ -v`).
+
+The test suite validates EMA behavior, checkpoint restoration, generator and discriminator operations, gradient propagation, loss implementations, evaluation functionality, training resume behavior, and configuration handling.
+
+The Git state is clean, with changes committed and pushed to `origin/main` (Commit `0adcd57`).
+
+# 10. Scientific Limitations
+
+The following limitations remain documented in the research record:
+
+1. The multi-seed study contains only three seeds per objective.
+2. The 614-image validation sample is relatively small for definitive FID conclusions.
+3. Inception-v3 feature geometry may not accurately represent all aspects of facial-image quality.
+4. Precision/Recall zero values from previous experiments should not be interpreted as proof of disjoint distributions.
+5. Activation outliers suggest an artifact mechanism but do not independently prove causality.
+6. MD5 verification detects exact file duplicates, not all perceptual duplicates.
+7. Nearest-neighbor similarity is not a complete memorization test.
+8. 128×128 memory feasibility does not establish successful progressive training.
+9. Reported metrics need to be reproducible from the committed configurations and checkpoints.
+10. Phase 3 and Phase 4 FID values require protocol reconciliation before cross-phase improvement claims.
+
+# 11. Final Phase 4 Assessment
+
+| Research area | Assessment |
+|---|---|
+| EMA mathematical investigation | Strong |
+| Multi-seed objective comparison | Promising |
+| Frequency-domain artifact analysis | Valuable |
+| Capacity optimization | Useful negative result |
+| 64×64 synthesis optimization | Further validation required |
+| 128×128 feasibility | Demonstrated by profiling |
+| Generalization audit | Encouraging preliminary evidence |
+| Automated testing | Passing (36/36) |
+| Reproducibility | Verified with test suite |
+
+# 12. Recommended Phase 5 Direction
+
+Phase 5 will focus on transforming StyleForge into a complete research-grade open-source project.
+
+Priority deliverables:
+
+1. Reproduce the selected training configuration.
+2. Reconcile Phase 3 and Phase 4 evaluation protocols.
+3. Validate EMA warm-up across longer training schedules.
+4. Expand multi-seed objective comparisons.
+5. Produce high-quality visual sample grids.
+6. Evaluate FID and KID with stronger sample-size protocols.
+7. Investigate feature-space Precision/Recall limitations.
+8. Validate 128×128 training rather than only memory profiling.
+9. Publish complete experiment configurations and checkpoints.
+10. Create comprehensive research documentation.
