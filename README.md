@@ -5,8 +5,8 @@ A research-grade StyleGAN-inspired face generation and latent exploration system
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.5+-ee4c2c.svg)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.1-76b900.svg)](https://developer.nvidia.com/cuda-zone)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests: 26 Passing](https://img.shields.io/badge/Tests-26%2F26%20Passing-brightgreen.svg)](tests/)
-[![Phase: 2 Milestone](https://img.shields.io/badge/Phase%202-Authentic%20CelebA%20Benchmark-blueviolet.svg)](docs/)
+[![Tests: 31 Passing](https://img.shields.io/badge/Tests-31%2F31%20Passing-brightgreen.svg)](tests/)
+[![Phase: 3 Milestone](https://img.shields.io/badge/Phase%203-Quality%20Audit%20%26%20Optimization-blueviolet.svg)](docs/)
 
 ---
 
@@ -45,6 +45,37 @@ Detailed Phase 2 reports, audit logs, and comparative charts:
 - [docs/visual_quality_analysis.md](docs/visual_quality_analysis.md) — SLERP, LERP, truncation, and style mixing
 - [docs/ablation_study.md](docs/ablation_study.md) — Controlled ablations (Attention, Spectral Norm, EMA)
 - [docs/phase2_limitations.md](docs/phase2_limitations.md) — Transparent research boundaries and hardware limits
+
+---
+
+## Phase 3 Experimental Benchmark: Quality Audit & Optimization (N=614)
+
+All evaluations conducted on the full, disjoint CelebA validation set ($N=614$) with official TorchMetrics Inception-v3:
+
+### 1. Extended Convergence Trajectory (Steps 1,000 to 1,500)
+| Checkpoint | Steps | Inception-v3 FID $\downarrow$ | KID Mean $\downarrow$ ($\pm \text{std}$) | Pairwise L1 Diversity $\uparrow$ | Batch Pixel Variance $\uparrow$ |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **StyleForge AdaIN (EMA)** | 1,000 | 383.71 | $0.5246 \pm 0.0171$ | 0.6512 | 0.37069 |
+| **StyleForge AdaIN (EMA)** | 1,250 | 358.29 | $0.4635 \pm 0.0156$ | 0.6286 | 0.35165 |
+| **StyleForge AdaIN (EMA)** | 1,500 | **336.98** | **$0.4167 \pm 0.0156$** | 0.6086 | 0.33447 |
+| **StyleForge AdaIN (Raw)** | 1,000 | 305.99 | $0.3531 \pm 0.0167$ | 0.5794 | 0.31068 |
+| **StyleForge AdaIN (Raw)** | 1,500 | **297.76** | **$0.3285 \pm 0.0159$** | 0.5635 | 0.28934 |
+
+### 2. Multi-EMA Sweep & Objective Optimization (300 Steps)
+| Configuration | Objective & Regularizer | Initial Weight Residual | Inception FID $\downarrow$ | KID Mean $\downarrow$ | Pairwise L1 $\uparrow$ |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Raw Instantaneous** | WGAN-GP ($\lambda=10.0$) | 0.00% | 381.61 | 0.5178 | 0.6354 |
+| **EMA decay = 0.990** | WGAN-GP ($\lambda=10.0$) | 4.90% | 393.73 | 0.5468 | 0.6605 |
+| **EMA decay = 0.995** | WGAN-GP ($\lambda=10.0$) | 22.23% | 409.50 | 0.5885 | 0.6864 |
+| **EMA decay = 0.999** | WGAN-GP ($\lambda=10.0$) | 74.06% | 419.60 | 0.6186 | **0.7159** |
+| **Phase F: Logistic + R1 (Raw)** | **Logistic + R1 ($\gamma=10.0$)** | 0.00% | **373.66** | **0.4975** | **0.6624** |
+
+Detailed Phase 3 research reports:
+- [docs/phase3_metric_audit.md](docs/phase3_metric_audit.md) — Mathematical verification of Precision/Recall & Inception geometry
+- [docs/phase3_ema_analysis.md](docs/phase3_ema_analysis.md) — Parameter lag, weight residual, and decay sweep analysis
+- [docs/phase3_visual_quality.md](docs/phase3_visual_quality.md) — Anatomical audit across facial landmarks and artifacts
+- [docs/phase3_memorization_audit.md](docs/phase3_memorization_audit.md) — Train vs Val nearest-neighbor analysis in pixel and feature space
+- [docs/phase3_training_results.md](docs/phase3_training_results.md) — Extended 1,500-step convergence and sub-300 FID milestone
 
 ---
 

@@ -1,0 +1,2 @@
+model_type,checkpoint_path,dataset,resolution,sample_count_real,sample_count_fake,fid,kid_mean,kid_std,inception_precision,inception_recall,pairwise_l1_diversity,pairwise_l2_diversity,batch_pixel_variance,timestamp
+stylegan,experiments/phase3_convergence/checkpoints/checkpoint_final.pt,CelebA Align&Cropped (Photographic),64x64,614,614,297.7561,0.328454,0.015863,0.0,0.0,0.5635,81.4933,0.289341,1794643893.7706368

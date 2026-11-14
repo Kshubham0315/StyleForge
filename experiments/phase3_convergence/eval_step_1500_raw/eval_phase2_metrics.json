@@ -1,0 +1,17 @@
+{
+  "model_type": "stylegan",
+  "checkpoint_path": "experiments/phase3_convergence/checkpoints/checkpoint_final.pt",
+  "dataset": "CelebA Align&Cropped (Photographic)",
+  "resolution": "64x64",
+  "sample_count_real": 614,
+  "sample_count_fake": 614,
+  "fid": 297.7561,
+  "kid_mean": 0.328454,
+  "kid_std": 0.015863,
+  "inception_precision": 0.0,
+  "inception_recall": 0.0,
+  "pairwise_l1_diversity": 0.5635,
+  "pairwise_l2_diversity": 81.4933,
+  "batch_pixel_variance": 0.289341,
+  "timestamp": 1794643893.7706368
+}
