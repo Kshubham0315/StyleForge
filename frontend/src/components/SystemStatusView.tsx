@@ -124,7 +124,7 @@ export const SystemStatusView: React.FC<SystemStatusViewProps> = ({
         <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "0.75rem" }}>Production Architecture Services</h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.75rem" }}>
           {[
-            { name: "Frontend", tech: "React + Vite (Port 3000)", status: "Active" },
+            { name: "Frontend", tech: "React + Vite (Port 5173)", status: "Active" },
             { name: "Backend API", tech: "FastAPI + Uvicorn (Port 8000)", status: "Active" },
             { name: "Database", tech: "PostgreSQL / SQLite (Port 5432)", status: "Active" },
             { name: "Artifacts", tech: "Local Disk / S3 Adapter", status: "Active" },
