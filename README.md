@@ -28,18 +28,18 @@
 ## Technical Highlights
 
 - **Style-Based Generator ($14.5\text{M}$ Parameters):** 8-layer MLP Mapping Network ($f: \mathcal{Z} \to \mathcal{W}$) with PixelNorm and equalized learning rate He scaling, learned constant spatial input ($4\times 4\times 512$), Adaptive Instance Normalization (AdaIN), and per-channel stochastic noise injection.
-- **Contrast Collapse Resolution:** Empirical proof of mode and contrast collapse in standard convolutional WGAN-GP ($[0, 141]$ dynamic range, $\sigma=29.6$) contrasted with full dynamic range preservation in StyleForge ($[0, 255]$, $242\times$ higher variance).
-- **Dynamic Warm-Up EMA Scheduling:** Mathematical formulation and empirical proof that dynamic scheduling $\beta(t) = \min(\beta, \frac{1+t}{10+t})$ eliminates parameter lag, cutting **$36.31$ FID points** from standard uncorrected EMA.
-- **Multi-Seed Loss Optimization:** Rigorous 3-seed benchmark ($\{42, 123, 777\}$) proving that zero-centered $R_1$ regularization stabilizes non-saturating logistic loss ($\sigma_\text{FID} = 12.13$) and yields a **$\sim 20$-point FID lead over WGAN-GP** ($374.54$ vs $394.25$).
+- **Contrast Collapse Resolution:** Empirical demonstration of mode and contrast collapse in standard convolutional WGAN-GP ($[0, 141]$ dynamic range, $\sigma=29.6$) contrasted with full dynamic range preservation in StyleForge ($[0, 255]$, $242\times$ higher variance).
+- **Dynamic Warm-Up EMA Scheduling:** Mathematical analysis showing that dynamic scheduling $\beta(t) = \min(\beta, \frac{1+t}{10+t})$ reduces early initialization lag under tested configurations, recovering **$36.31$ FID points** relative to standard uncorrected EMA.
+- **Multi-Seed Loss Optimization:** Controlled 3-seed benchmark ($\{42, 123, 777\}$) providing preliminary evidence that zero-centered $R_1$ regularization stabilizes non-saturating logistic loss ($\sigma_\text{FID} = 12.13$) relative to unregularized loss.
 - **Spectral Frequency Decomposition:** 2D Fast Fourier Transform (FFT) analysis isolating AdaIN spatial outlier spikes ($39.32$ peak-to-mean ratio) and demonstrating that low-pass binomial FIR filtering attenuates high-frequency aliasing by **$71.1\%$**.
-- **Cryptographic Generalization Audit:** $100\%$ split disjointness across $6,140$ CelebA images (0 hash collisions) and nearest-neighbor distance parity ($\frac{d_\text{train}}{d_\text{test}} = 0.9806$ in pixel space and $0.9996$ in Inception space), verifying generalization over memorization.
-- **Consumer Hardware Optimized:** Fully calibrated and profiled on an **NVIDIA GeForce RTX 4050 6GB Laptop GPU** ($1.42\text{ GB}$ peak VRAM during $64\times 64$ training; lightweight $110.95\text{ MB}$ production inference weights).
+- **Generalization & Memorization Audit:** Cryptographic verification of zero split leakage (0 hash collisions across 6,140 images) and nearest-neighbor distance parity ($\frac{d_\text{train}}{d_\text{test}} = 0.9806$ in pixel space and $0.9996$ in Inception space). *No strong evidence of direct training-image memorization was observed under the tested nearest-neighbor protocols; these results do not establish the absence of memorization or prove generalization.*
+- **Consumer Hardware Optimized:** Fully calibrated and profiled on an **NVIDIA GeForce RTX 4050 6GB Laptop GPU** ($1.42\text{ GB}$ peak VRAM during $64\times 64$ training; $110.95\text{ MB}$ production inference weights).
 
 ---
 
 ## Master Reconciled Benchmark
 
-All models evaluated on the authentic CelebA photographic validation partition ($N=614, 64\times 64$) with official TorchMetrics Inception-v3 pool3 ($2048$-dim):
+All models evaluated on the authentic CelebA photographic validation partition ($N=614, 64\times 64$) with official TorchMetrics Inception-v3 pool3 ($2048$-dim). Note that FID at $64\times 64$ with a 614-image validation set reflects distribution divergence under this specific protocol, rather than state-of-the-art photorealism.
 
 | Milestone / Model Configuration | Global Steps | Adversarial Objective | Inception-v3 FID ↓ | KID $\times 10^3$ ↓ | Pairwise $L_1$ Div ↑ | Batch Pixel Var ↑ | Peak VRAM |
 |---|:---:|---|:---:|:---:|:---:|:---:|:---:|
@@ -52,7 +52,30 @@ All models evaluated on the authentic CelebA photographic validation partition (
 | Phase 4 Multi-Seed WGAN-GP ($N=3$) | 200 | WGAN-GP ($\lambda=10.0$) | $394.25 \pm 6.9$ | $552.5 \pm 13.3$ | $0.6499$ | $0.39957$ | $1.42\text{ GB}$ |
 | Classical Convolutional Baseline | 1,000 | WGAN-GP ($\lambda=10.0$) | $344.90$ | $422.5 \pm 9.8$ | $0.0410$ | $0.00153$ | $0.27\text{ GB}$ |
 
-*See [reports/PHASE5_FINAL_BENCHMARK.md](reports/PHASE5_FINAL_BENCHMARK.md) for full step-progression reconciliation details.*
+*The results across checkpoints are consistent with improved training progression, although differences in experimental configuration may also contribute. See [reports/PHASE5_FINAL_BENCHMARK.md](reports/PHASE5_FINAL_BENCHMARK.md).*
+
+---
+
+## Model Checkpoint Installation
+
+The production checkpoint is excluded from Git tracking via `.gitignore` to maintain a lightweight repository footprint.
+
+### Expected Local Location
+```
+checkpoints/styleforge_final_model.pt
+```
+
+### Checkpoint Metadata
+- **File Size:** $116,336,534$ bytes ($110.95\text{ MB}$)
+- **SHA-256 Checksum:** `ec8e4bf1e4f21f240f7793a1b3922a4510394831d0c39de521c4cd456c9eed64`
+- **Contents:** Stripped parameter dictionaries for both Raw Generator (Step 1,500) and EMA Generator (Step 1,500).
+
+### Checkpoint Installation Workflow
+1. **Local Export:** If you have trained checkpoints locally, generate the production file via:
+   ```bash
+   python scripts/export_final_model.py
+   ```
+2. **Manual Placement:** Alternatively, place the downloaded `styleforge_final_model.pt` into the `checkpoints/` directory. Inference scripts will automatically detect and load it.
 
 ---
 

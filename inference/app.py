@@ -27,7 +27,7 @@ except Exception as e:
 
 def generate_faces(seed, num_samples, truncation_psi, use_ema, randomize_seed):
     if engine is None:
-        return None, f"Error: {init_error}"
+        return None, None, f"Error: {init_error}"
     if randomize_seed:
         seed = int(np.random.randint(0, 2**31 - 1))
     else:
@@ -44,7 +44,7 @@ def generate_faces(seed, num_samples, truncation_psi, use_ema, randomize_seed):
 
 def run_interpolation(seed_a, seed_b, steps, space, truncation_psi, use_ema):
     if engine is None:
-        return None, f"Error: {init_error}"
+        return None, None, f"Error: {init_error}"
 
     frames = engine.interpolate(
         seed_a=int(seed_a),
@@ -72,11 +72,12 @@ def run_style_mix(seed_a, seed_b, coarse_source, truncation_psi, use_ema):
     msg = f"Style mixing complete. Coarse geometry from {'Seed B' if coarse_from_b else 'Seed A'}."
     return img_a, img_b, img_mixed, msg
 
-# Gradio Theme and Layout
+# Gradio Theme and Layout (Using system fonts for instant offline/air-gapped loading)
 theme = gr.themes.Soft(
     primary_hue="blue",
     secondary_hue="slate",
     neutral_hue="gray",
+    font=["system-ui", "sans-serif"],
 )
 
 with gr.Blocks(theme=theme, title="StyleForge — Generative AI Studio") as demo:

@@ -43,7 +43,7 @@ StyleForge is a style-based generative adversarial network engineered for human 
 | **Critic / Discriminator** | Multi-scale residual critic with Minibatch Standard Deviation |
 | **Generator Parameters** | $14,535,875$ |
 | **Critic Parameters** | $12,174,721$ |
-| **Exported Checkpoint** | `checkpoints/styleforge_final_model.pt` ($110.95\text{ MB}$, stripped optimizers) |
+| **Exported Checkpoint** | `checkpoints/styleforge_final_model.pt` ($110.95\text{ MB}$, stripped optimizers; generate via `python scripts/export_final_model.py` or download from GitHub Releases) |
 
 ---
 
@@ -65,7 +65,7 @@ All metrics evaluated against authentic photographic CelebA validation images ($
 - **Memorization Probing:** Generated samples exhibit equal distance to training and unseen test samples:
   - Pixel $L_2$ Ratio ($\frac{d_\text{train}}{d_\text{test}}$): **$0.9806$** (Parity within $1.9\%$)
   - Inception pool3 Ratio ($\frac{d_\text{train}}{d_\text{test}}$): **$0.9996$** (Parity within $0.04\%$)
-- Under tested nearest-neighbor protocols, no evidence of verbatim training exemplar memorization was detected.
+- No strong evidence of direct training-image memorization was observed under the tested nearest-neighbor protocols. These results do not establish the absence of memorization or prove generalization.
 
 ---
 

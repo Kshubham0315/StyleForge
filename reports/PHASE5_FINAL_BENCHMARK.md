@@ -16,7 +16,7 @@ To determine whether this divergence was caused by metric implementation, image 
 
 ### Core Finding
 **The evaluation methodologies and metric implementations are identical.**  
-The numerical difference is caused solely by **training duration and convergence trajectory**:
+The results are consistent with improved training progression, although differences in experimental configuration may also contribute:
 - **Phase 4 Multi-Seed Sweep (Steps 200–300):** Investigated early-stage EMA initialization, seed variance ($\{42, 123, 777\}$), and regularizer dynamics. At step 300, generators operate in the $369$ to $385$ FID regime.
 - **Phase 2 Extended Training (Step 1,000):** Advanced facial structure synthesis, reaching FID **$305.99$**.
 - **Phase 3 Convergence (Step 1,500):** Fully converged $64\times 64$ synthesis checkpoint, achieving the project best FID of **$297.76$** (Raw) and **$336.98$** (EMA).

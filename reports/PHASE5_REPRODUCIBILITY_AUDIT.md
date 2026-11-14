@@ -61,4 +61,4 @@ The project operates under pure FP32 calibration. For external reproduction, the
 
 ## 5. Audit Conclusion
 
-The StyleForge codebase is fully certified for external reproduction. All model weights, dataset partitions, and latent inference paths execute deterministically on CUDA hardware.
+Bit-exact inference reproducibility and deterministic validation data loading were verified under the audited environment. Full end-to-end retraining reproducibility across different hardware/CUDA environments has not yet been independently established.

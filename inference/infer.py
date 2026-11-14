@@ -44,21 +44,39 @@ class StyleForgeInference:
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
-            self.device = torch.device(device)
+            req_dev = str(device).lower()
+            if "cuda" in req_dev and not torch.cuda.is_available():
+                import warnings
+                warnings.warn("CUDA requested but not available. Falling back to CPU.", UserWarning)
+                self.device = torch.device("cpu")
+            else:
+                self.device = torch.device(device)
+
+        candidates = [
+            Path("checkpoints/styleforge_final_model.pt"),
+            Path("experiments/phase3_convergence/checkpoints/checkpoint_final.pt"),
+            Path("experiments/phase2_stylegan_adain/checkpoints/checkpoint_final.pt"),
+        ]
 
         if checkpoint_path is None:
-            candidates = [
-                Path("checkpoints/styleforge_final_model.pt"),
-                Path("experiments/phase3_convergence/checkpoints/checkpoint_final.pt"),
-                Path("experiments/phase2_stylegan_adain/checkpoints/checkpoint_final.pt"),
-            ]
             for c in candidates:
                 if c.exists():
                     checkpoint_path = c
                     break
 
         if checkpoint_path is None or not Path(checkpoint_path).exists():
-            raise FileNotFoundError(f"Checkpoint not found. Checked default paths: {candidates}")
+            checked_paths = [str(c) for c in candidates]
+            err_msg = (
+                f"StyleForge checkpoint not found.\n"
+                f"Checked default locations:\n  - " + "\n  - ".join(checked_paths) + "\n\n"
+                f"Installation Instructions:\n"
+                f"1. If you trained the model locally, export the production checkpoint via:\n"
+                f"     python scripts/export_final_model.py\n"
+                f"2. Or place 'styleforge_final_model.pt' into the 'checkpoints/' directory.\n"
+                f"Expected path: checkpoints/styleforge_final_model.pt\n"
+                f"SHA256: ec8e4bf1e4f21f240f7793a1b3922a4510394831d0c39de521c4cd456c9eed64"
+            )
+            raise FileNotFoundError(err_msg)
 
         self.checkpoint_path = Path(checkpoint_path)
         self._load_models()
@@ -66,6 +84,12 @@ class StyleForgeInference:
     def _load_models(self):
         """Loads both Raw and EMA generator models into evaluation mode."""
         payload = torch.load(self.checkpoint_path, map_location="cpu", weights_only=False)
+        if not isinstance(payload, dict):
+            raise ValueError(f"Invalid checkpoint at {self.checkpoint_path}: expected dictionary payload.")
+
+        raw_state = payload.get("generator") or payload.get("model_state_dict")
+        if raw_state is None:
+            raise ValueError(f"Invalid checkpoint at {self.checkpoint_path}: missing generator state dictionary.")
 
         latent_dim = payload.get("latent_dim", 512)
         style_dim = payload.get("style_dim", 512)
@@ -73,7 +97,6 @@ class StyleForgeInference:
 
         # 1. Raw Generator
         self.raw_generator = StyleGenerator(latent_dim=latent_dim, style_dim=style_dim, img_size=img_size)
-        raw_state = payload.get("generator") or payload.get("model_state_dict")
         cleaned_raw = {k.replace("module.", ""): v for k, v in raw_state.items()}
         self.raw_generator.load_state_dict(cleaned_raw)
         self.raw_generator.to(self.device).eval()
@@ -108,6 +131,11 @@ class StyleForgeInference:
         use_ema: bool = False,
     ) -> List[Image.Image]:
         """Generate one or more faces from random or fixed seeds."""
+        if num_samples < 1:
+            raise ValueError(f"num_samples must be >= 1, got {num_samples}")
+        if truncation_psi < 0.0:
+            raise ValueError(f"truncation_psi must be >= 0.0, got {truncation_psi}")
+
         model = self._get_active_model(use_ema)
 
         if seed is not None:
@@ -132,6 +160,13 @@ class StyleForgeInference:
         use_ema: bool = False,
     ) -> List[Image.Image]:
         """Generate smooth continuous interpolation sequence between two seeds."""
+        if steps < 2:
+            raise ValueError(f"steps must be >= 2, got {steps}")
+        if space.upper() not in ("W", "Z"):
+            raise ValueError(f"space must be 'W' or 'Z', got '{space}'")
+        if truncation_psi < 0.0:
+            raise ValueError(f"truncation_psi must be >= 0.0, got {truncation_psi}")
+
         model = self._get_active_model(use_ema)
 
         # Seed A
@@ -182,6 +217,9 @@ class StyleForgeInference:
         use_ema: bool = False,
     ) -> Tuple[Image.Image, Image.Image, Image.Image]:
         """Mix coarse structure from one seed with fine appearance from another."""
+        if truncation_psi < 0.0:
+            raise ValueError(f"truncation_psi must be >= 0.0, got {truncation_psi}")
+
         model = self._get_active_model(use_ema)
 
         torch.manual_seed(seed_a)
