@@ -1,14 +1,14 @@
 {
   "dataset_name": "CelebA_Pilot_Partition",
   "data_dir": "data\\celeba\\img_align_celeba",
-  "total_images": 500,
-  "train_samples": 450,
-  "val_samples": 50,
+  "total_images": 6140,
+  "train_samples": 4912,
+  "val_samples": 614,
   "train_val_overlap": 0,
   "zero_leakage_verified": true,
   "input_resolution": [
-    128,
-    128
+    178,
+    218
   ],
   "target_resolution": [
     64,

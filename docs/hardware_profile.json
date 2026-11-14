@@ -1,0 +1,67 @@
+[
+  {
+    "model": "baseline",
+    "batch_size": 32,
+    "use_amp": false,
+    "peak_allocated_mb": 271.04,
+    "peak_reserved_mb": 346.0,
+    "steps_per_sec": 7.96,
+    "samples_per_sec": 254.64,
+    "elapsed_sec": 3.77,
+    "nan_detected": false,
+    "memory_drift_mb": 1.5,
+    "stable": true
+  },
+  {
+    "model": "baseline",
+    "batch_size": 32,
+    "use_amp": true,
+    "peak_allocated_mb": 247.83,
+    "peak_reserved_mb": 366.0,
+    "steps_per_sec": 10.03,
+    "samples_per_sec": 320.99,
+    "elapsed_sec": 2.99,
+    "nan_detected": false,
+    "memory_drift_mb": 52.15,
+    "stable": true
+  },
+  {
+    "model": "styleforge",
+    "batch_size": 16,
+    "use_amp": false,
+    "peak_allocated_mb": 1445.74,
+    "peak_reserved_mb": 1678.0,
+    "steps_per_sec": 2.6,
+    "samples_per_sec": 41.63,
+    "elapsed_sec": 11.53,
+    "nan_detected": false,
+    "memory_drift_mb": 2.52,
+    "stable": true
+  },
+  {
+    "model": "styleforge",
+    "batch_size": 16,
+    "use_amp": true,
+    "peak_allocated_mb": 1117.67,
+    "peak_reserved_mb": 1382.0,
+    "steps_per_sec": 2.35,
+    "samples_per_sec": 37.54,
+    "elapsed_sec": 12.78,
+    "nan_detected": false,
+    "memory_drift_mb": 4.49,
+    "stable": true
+  },
+  {
+    "model": "styleforge",
+    "batch_size": 32,
+    "use_amp": false,
+    "peak_allocated_mb": 2403.65,
+    "peak_reserved_mb": 2756.0,
+    "steps_per_sec": 1.32,
+    "samples_per_sec": 42.22,
+    "elapsed_sec": 22.74,
+    "nan_detected": false,
+    "memory_drift_mb": 1.02,
+    "stable": true
+  }
+]
