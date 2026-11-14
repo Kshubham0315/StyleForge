@@ -1,0 +1,2 @@
+model_type,checkpoint_path,dataset,resolution,sample_count_real,sample_count_fake,fid,kid_mean,kid_std,inception_precision,inception_recall,pairwise_l1_diversity,pairwise_l2_diversity,batch_pixel_variance,timestamp
+stylegan,experiments/phase2_ablation_self_attention/checkpoints/checkpoint_final.pt,CelebA Align&Cropped (Photographic),64x64,614,614,404.1891,0.585477,0.013002,0.0,0.0,0.6918,97.8105,0.39405,1794641248.7427506
