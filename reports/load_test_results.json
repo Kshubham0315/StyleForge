@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-11-14T13:21:15Z",
+  "gpu_concurrency_semaphore_limit": 1,
+  "tiers": {
+    "concurrency_1": {
+      "concurrency": 1,
+      "total_requests": 16,
+      "successful_requests": 16,
+      "failed_requests": 0,
+      "error_rate_pct": 0.0,
+      "duration_seconds": 0.42,
+      "throughput_rps": 37.67,
+      "faces_per_sec": 37.67,
+      "latency_p50_ms": 26.26,
+      "latency_p90_ms": 27.04,
+      "latency_p95_ms": 28.48,
+      "latency_p99_ms": 30.78,
+      "latency_mean_ms": 26.5,
+      "peak_vram_mb": 139.06
+    },
+    "concurrency_2": {
+      "concurrency": 2,
+      "total_requests": 16,
+      "successful_requests": 16,
+      "failed_requests": 0,
+      "error_rate_pct": 0.0,
+      "duration_seconds": 0.33,
+      "throughput_rps": 48.0,
+      "faces_per_sec": 48.0,
+      "latency_p50_ms": 40.1,
+      "latency_p90_ms": 46.26,
+      "latency_p95_ms": 47.05,
+      "latency_p99_ms": 47.6,
+      "latency_mean_ms": 40.47,
+      "peak_vram_mb": 147.18
+    },
+    "concurrency_4": {
+      "concurrency": 4,
+      "total_requests": 16,
+      "successful_requests": 16,
+      "failed_requests": 0,
+      "error_rate_pct": 0.0,
+      "duration_seconds": 0.33,
+      "throughput_rps": 48.28,
+      "faces_per_sec": 48.28,
+      "latency_p50_ms": 79.07,
+      "latency_p90_ms": 86.7,
+      "latency_p95_ms": 90.62,
+      "latency_p99_ms": 99.18,
+      "latency_mean_ms": 76.26,
+      "peak_vram_mb": 147.18
+    },
+    "concurrency_8": {
+      "concurrency": 8,
+      "total_requests": 16,
+      "successful_requests": 16,
+      "failed_requests": 0,
+      "error_rate_pct": 0.0,
+      "duration_seconds": 0.31,
+      "throughput_rps": 51.28,
+      "faces_per_sec": 51.28,
+      "latency_p50_ms": 141.81,
+      "latency_p90_ms": 153.63,
+      "latency_p95_ms": 159.04,
+      "latency_p99_ms": 171.78,
+      "latency_mean_ms": 127.27,
+      "peak_vram_mb": 147.18
+    }
+  }
+}

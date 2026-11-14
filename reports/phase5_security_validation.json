@@ -1,0 +1,44 @@
+{
+  "authentication": {
+    "missing_credentials_status": 401,
+    "missing_credentials_blocked": true,
+    "invalid_key_status": 401,
+    "invalid_key_blocked": true,
+    "valid_key_status": 200,
+    "valid_key_accepted": true
+  },
+  "rate_limiting": {
+    "limit_threshold": 10,
+    "blocked_at_request": 11,
+    "rate_limiting_enforced": true
+  },
+  "input_validation": {
+    "samples_overflow_status": 422,
+    "samples_overflow_rejected": true,
+    "negative_samples_status": 422,
+    "negative_samples_rejected": true,
+    "psi_overflow_status": 422,
+    "psi_overflow_rejected": true,
+    "sqli_in_mode_status": 422,
+    "sqli_in_mode_rejected": true,
+    "sqli_query_param_status": 200,
+    "sqli_query_param_safe": true
+  },
+  "path_traversal": {
+    "payloads_tested": 5,
+    "all_blocked": true
+  },
+  "persistence_and_artifacts": {
+    "get_by_id_status": 200,
+    "get_by_id_matches": true,
+    "found_in_history_list": true,
+    "artifact_download_status": 200,
+    "artifact_content_type": "image/png",
+    "artifact_size_bytes": 9490,
+    "artifact_valid_png": true
+  },
+  "user_isolation": {
+    "admin_total_visible": 17,
+    "isolation_supported": true
+  }
+}

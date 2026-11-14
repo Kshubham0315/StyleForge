@@ -1,0 +1,86 @@
+{
+  "hardware": {
+    "cuda_available": true,
+    "device_name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "total_vram_mb": 6140.5,
+    "torch_version": "2.5.1+cu121",
+    "cuda_version": "12.1"
+  },
+  "checkpoint": {
+    "path": "checkpoints\\styleforge_final_model.pt",
+    "sha256": "ec8e4bf1e4f21f240f7793a1b3922a4510394831d0c39de521c4cd456c9eed64",
+    "file_size_mb": 110.95,
+    "has_generator_raw": true,
+    "has_generator_ema": true,
+    "img_size": 64
+  },
+  "cold_start": {
+    "load_time_ms": 776.5,
+    "vram_before_load_mb": 0.0,
+    "vram_after_load_mb": 111.91,
+    "vram_model_weights_mb": 111.91
+  },
+  "first_inference": {
+    "total_first_inf_ms": 201.68,
+    "internal_telemetry_ms": 193.54
+  },
+  "warm_benchmark_b1": {
+    "iterations": 20,
+    "p50_ms": 4.49,
+    "p95_ms": 5.92,
+    "p99_ms": 6.1,
+    "mean_ms": 4.85,
+    "min_ms": 4.17,
+    "max_ms": 6.15,
+    "peak_vram_mb": 139.06
+  },
+  "batch_scaling": {
+    "batch_4": {
+      "mean_latency_ms": 11.03,
+      "latency_per_face_ms": 2.76
+    },
+    "batch_8": {
+      "mean_latency_ms": 10.25,
+      "latency_per_face_ms": 1.28
+    }
+  },
+  "tensor_audit": {
+    "shape": [
+      4,
+      3,
+      64,
+      64
+    ],
+    "expected_shape": [
+      4,
+      3,
+      64,
+      64
+    ],
+    "shape_correct": true,
+    "min_val": -1.0,
+    "max_val": 1.0,
+    "mean_val": -0.1559,
+    "range_valid": true,
+    "has_nan": false,
+    "has_inf": false,
+    "finite": true
+  },
+  "mode_comparison": {
+    "standard_noise_scale": 1.0,
+    "smooth_noise_scale": 0.25,
+    "l1_pixel_diff": 5.03,
+    "different_outputs": true
+  },
+  "determinism": {
+    "seed": 12345,
+    "identical": true,
+    "max_abs_diff": 0.0
+  },
+  "cpu_fallback": {
+    "device": "cpu",
+    "cpu_load_ms": 253.29,
+    "cpu_inference_ms": 31.19,
+    "success": true
+  }
+}

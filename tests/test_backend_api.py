@@ -105,14 +105,14 @@ def test_generation_history_and_artifact_download():
     download_url = res_gen.json()["images"][0]["download_url"]
 
     # Query history
-    res_hist = client.get("/api/v1/generations?limit=10")
+    res_hist = client.get("/api/v1/generations?limit=10", headers=headers)
     assert res_hist.status_code == 200
     hist_data = res_hist.json()
     assert hist_data["total"] >= 1
     assert any(item["id"] == gen_id for item in hist_data["items"])
 
     # Query single generation by ID
-    res_single = client.get(f"/api/v1/generations/{gen_id}")
+    res_single = client.get(f"/api/v1/generations/{gen_id}", headers=headers)
     assert res_single.status_code == 200
     assert res_single.json()["id"] == gen_id
 
@@ -137,3 +137,36 @@ def test_generate_input_validation():
     # Invalid mode
     res_invalid_mode = client.post("/api/v1/generate", json={"mode": "INVALID_MODE"}, headers=headers)
     assert res_invalid_mode.status_code == 422
+
+
+def test_interpolate_endpoint():
+    headers = {"X-API-Key": settings.API_KEY}
+    payload = {
+        "seed_a": 100,
+        "seed_b": 200,
+        "steps": 4,
+        "space": "W",
+    }
+    res = client.post("/api/v1/interpolate", json=payload, headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "completed"
+    assert len(data["frames"]) == 4
+    assert data["space"] == "W"
+
+
+def test_style_mix_endpoint():
+    headers = {"X-API-Key": settings.API_KEY}
+    payload = {
+        "seed_a": 100,
+        "seed_b": 200,
+        "coarse_from_b": True,
+    }
+    res = client.post("/api/v1/mix-styles", json=payload, headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "completed"
+    assert "source_a" in data
+    assert "source_b" in data
+    assert "mixed" in data
+

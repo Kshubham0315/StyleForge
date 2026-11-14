@@ -174,6 +174,7 @@ def readiness_check():
     return {"status": "ready"}
 
 
+@app.get("/metrics", tags=["observability"], summary="Prometheus scrape endpoint")
 @app.get("/api/v1/metrics", tags=["observability"], summary="Prometheus scrape endpoint")
 def prometheus_metrics():
     """Exports system and inference telemetry in Prometheus exposition format."""

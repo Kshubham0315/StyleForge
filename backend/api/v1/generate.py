@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timezone
 import logging
+import threading
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -46,14 +47,29 @@ from core.engine.postprocessor import ImagePostProcessor
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["generation"])
 
-# Bounded concurrency semaphore for GPU memory safety (lazy initialized within event loop)
-_gpu_semaphore: Optional[asyncio.Semaphore] = None
+
+class AsyncThreadSafeSemaphore:
+    """Bounded semaphore safe across multiple event loops and thread worker pools."""
+
+    def __init__(self, value: int):
+        self._sem = threading.Semaphore(value)
+
+    async def __aenter__(self):
+        await asyncio.to_thread(self._sem.acquire)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self._sem.release()
 
 
-def get_gpu_semaphore() -> asyncio.Semaphore:
+# Bounded concurrency semaphore for GPU memory safety
+_gpu_semaphore: Optional[AsyncThreadSafeSemaphore] = None
+
+
+def get_gpu_semaphore() -> AsyncThreadSafeSemaphore:
     global _gpu_semaphore
     if _gpu_semaphore is None:
-        _gpu_semaphore = asyncio.Semaphore(settings.GPU_CONCURRENCY_LIMIT)
+        _gpu_semaphore = AsyncThreadSafeSemaphore(settings.GPU_CONCURRENCY_LIMIT)
     return _gpu_semaphore
 
 
