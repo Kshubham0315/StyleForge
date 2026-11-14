@@ -1,0 +1,169 @@
+{
+  "timestamp": "2026-11-14T16:15:00Z",
+  "checkpoint_evaluated": "checkpoints\\styleforge_final_model.pt",
+  "device": "cuda",
+  "noise_weights": {
+    "synthesis.initial_noise": {
+      "mean": 0.00011166511103510857,
+      "max": 0.011471733450889587,
+      "is_zero": false
+    },
+    "synthesis.initial_block.noise": {
+      "mean": -5.840185622218996e-05,
+      "max": 0.013757804408669472,
+      "is_zero": false
+    },
+    "synthesis.blocks.res_8_b1.noise": {
+      "mean": 2.4897708499338478e-06,
+      "max": 0.010756457224488258,
+      "is_zero": false
+    },
+    "synthesis.blocks.res_8_b2.noise": {
+      "mean": 0.0002274894795846194,
+      "max": 0.010684370063245296,
+      "is_zero": false
+    },
+    "synthesis.blocks.res_16_b1.noise": {
+      "mean": -0.0002821731613948941,
+      "max": 0.011988150887191296,
+      "is_zero": false
+    },
+    "synthesis.blocks.res_16_b2.noise": {
+      "mean": 5.679605237673968e-05,
+      "max": 0.01328956987708807,
+      "is_zero": false
+    },
+    "synthesis.blocks.res_32_b1.noise": {
+      "mean": 0.0004229996702633798,
+      "max": 0.013005273416638374,
+      "is_zero": false
+    },
+    "synthesis.blocks.res_32_b2.noise": {
+      "mean": -0.001012491062283516,
+      "max": 0.013054819777607918,
+      "is_zero": false
+    },
+    "synthesis.blocks.res_64_b1.noise": {
+      "mean": -0.0027965179178863764,
+      "max": 0.06808097660541534,
+      "is_zero": false
+    },
+    "synthesis.blocks.res_64_b2.noise": {
+      "mean": -0.01263350062072277,
+      "max": 0.13432620465755463,
+      "is_zero": false
+    }
+  },
+  "w_space": {
+    "raw_w_avg_norm": 21.687110900878906,
+    "ema_w_avg_norm": 21.687110900878906,
+    "w_std": 1.0296491384506226,
+    "w_mean": 0.463159441947937
+  },
+  "noise_ablation": {
+    "mean_abs_diff_with_vs_without_noise": 0.13793161511421204
+  },
+  "reproduced_outputs": {
+    "raw": {
+      "psi_0.5": {
+        "min": -0.9999997615814209,
+        "max": 0.9999999403953552,
+        "mean": -0.1695142686367035,
+        "std": 0.6001562476158142
+      },
+      "psi_0.7": {
+        "min": -1.0,
+        "max": 1.0,
+        "mean": -0.16344520449638367,
+        "std": 0.615953803062439
+      },
+      "psi_0.8": {
+        "min": -1.0,
+        "max": 1.0,
+        "mean": -0.1610354483127594,
+        "std": 0.6263443827629089
+      },
+      "psi_1.0": {
+        "min": -1.0,
+        "max": 1.0,
+        "mean": -0.1562541127204895,
+        "std": 0.6496869325637817
+      }
+    },
+    "ema": {
+      "psi_0.5": {
+        "min": -0.9999997019767761,
+        "max": 0.9999999403953552,
+        "mean": -0.1467222273349762,
+        "std": 0.6527484655380249
+      },
+      "psi_0.7": {
+        "min": -1.0,
+        "max": 1.0,
+        "mean": -0.13859035074710846,
+        "std": 0.6652861833572388
+      },
+      "psi_0.8": {
+        "min": -1.0,
+        "max": 1.0,
+        "mean": -0.13568615913391113,
+        "std": 0.6726925373077393
+      },
+      "psi_1.0": {
+        "min": -1.0,
+        "max": 1.0,
+        "mean": -0.13035084307193756,
+        "std": 0.6935355067253113
+      }
+    }
+  },
+  "spectral_psd": {
+    "hf_ratio_real": 4.647562171217087e-05,
+    "hf_ratio_raw": 9.011748724930632e-05,
+    "hf_ratio_ema": 6.83568771006032e-05
+  },
+  "training_trajectory": {
+    "total_logged_steps": 500,
+    "final_step": 1500,
+    "final_loss_d": 0.0,
+    "final_loss_g": 49.08998489379883,
+    "final_d_real": 0.0,
+    "final_d_fake": 0.0,
+    "mean_penalty": 18.655417577028274,
+    "mean_grad_norm_g": 34.08780310821533
+  },
+  "quantitative_metrics": {
+    "raw_psi_0.8": {
+      "fid": 298.8581237792969,
+      "kid_mean": 0.3100005090236664,
+      "pixel_variance": 0.2908622920513153,
+      "pairwise_l1": 0.5861820578575134,
+      "precision": 0.0,
+      "recall": 0.0
+    },
+    "ema_psi_0.8": {
+      "fid": 339.4977722167969,
+      "kid_mean": 0.4046440124511719,
+      "pixel_variance": 0.33475419878959656,
+      "pairwise_l1": 0.6276735067367554,
+      "precision": 0.0,
+      "recall": 0.0
+    },
+    "raw_psi_1.0": {
+      "fid": 305.03314208984375,
+      "kid_mean": 0.32376107573509216,
+      "pixel_variance": 0.3463445007801056,
+      "pairwise_l1": 0.6501729488372803,
+      "precision": 0.0,
+      "recall": 0.0
+    },
+    "ema_psi_1.0": {
+      "fid": 349.9089660644531,
+      "kid_mean": 0.4295761287212372,
+      "pixel_variance": 0.3957156836986542,
+      "pairwise_l1": 0.6939584612846375,
+      "precision": 0.0,
+      "recall": 0.0
+    }
+  }
+}
