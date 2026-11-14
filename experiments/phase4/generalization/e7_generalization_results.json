@@ -1,0 +1,24 @@
+{
+  "leakage_audit": {
+    "train_count": 4912,
+    "val_count": 614,
+    "test_count": 614,
+    "train_val_overlap": 0,
+    "train_test_overlap": 0,
+    "val_test_overlap": 0,
+    "leakage_detected": false
+  },
+  "pixel_memorization_probe": {
+    "mean_min_dist_to_train": 81.36380004882812,
+    "std_min_dist_to_train": 5.258805751800537,
+    "mean_min_dist_to_test": 82.97171783447266,
+    "std_min_dist_to_test": 5.43513822555542,
+    "train_test_dist_ratio": 0.9806208930293753,
+    "memorization_detected": false
+  },
+  "perceptual_feature_probe": {
+    "mean_min_feat_dist_train": 19.234773635864258,
+    "mean_min_feat_dist_test": 19.241580963134766,
+    "perceptual_train_test_ratio": 0.9996462173622837
+  }
+}

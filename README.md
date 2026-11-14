@@ -5,8 +5,8 @@ A research-grade StyleGAN-inspired face generation and latent exploration system
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.5+-ee4c2c.svg)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.1-76b900.svg)](https://developer.nvidia.com/cuda-zone)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests: 31 Passing](https://img.shields.io/badge/Tests-31%2F31%20Passing-brightgreen.svg)](tests/)
-[![Phase: 3 Milestone](https://img.shields.io/badge/Phase%203-Quality%20Audit%20%26%20Optimization-blueviolet.svg)](docs/)
+[![Tests: 36 Passing](https://img.shields.io/badge/Tests-36%2F36%20Passing-brightgreen.svg)](tests/)
+[![Phase: 4 Milestone](https://img.shields.io/badge/Phase%204-Architecture%20Optimization%20%26%20Generalization-success.svg)](reports/PHASE4_FINAL_REPORT.md)
 
 ---
 
@@ -76,6 +76,37 @@ Detailed Phase 3 research reports:
 - [docs/phase3_visual_quality.md](docs/phase3_visual_quality.md) — Anatomical audit across facial landmarks and artifacts
 - [docs/phase3_memorization_audit.md](docs/phase3_memorization_audit.md) — Train vs Val nearest-neighbor analysis in pixel and feature space
 - [docs/phase3_training_results.md](docs/phase3_training_results.md) — Extended 1,500-step convergence and sub-300 FID milestone
+
+---
+
+## Phase 4 Experimental Benchmark: Architecture Optimization & Generalization
+
+All evaluations conducted on the full, disjoint CelebA photographic validation partition ($N=614, 64 \times 64$) with official TorchMetrics Inception-v3:
+
+### 1. Master Milestone Benchmark
+
+| Experiment / Milestone | Configuration | Inception-v3 FID $\downarrow$ | KID Mean $\downarrow$ ($\times 10^3$) | Pairwise L1 Diversity $\uparrow$ | Batch Pixel Variance $\uparrow$ | Hardware / Memory | Status |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **E1: Raw Instantaneous** | Instantaneous weights | $381.75$ | $517.1$ | $0.6355$ | $0.36877$ | $1.42\text{ GB}$ | Verified |
+| **E1: Uncorrected EMA** | $\beta=0.999$, static | $419.32$ | $618.4$ | $0.7158$ | $0.43513$ | $1.42\text{ GB}$ | Inertia Lag |
+| **E1: Debiased EMA** | Model-init debiased | $404.24$ | $574.3$ | $0.6666$ | $0.39945$ | $1.42\text{ GB}$ | -15.1 pts vs uncorr. |
+| **E1: Warmup EMA (Best)** | Dynamic warmup schedule | **$383.01$** | **$518.1$** | $0.6419$ | $0.37611$ | $1.42\text{ GB}$ | **-36.3 pts vs uncorr.** |
+| **E2: WGAN-GP** | Multi-seed ($N=3$) | $394.25 \pm 6.86$ | $552.5 \pm 13.3$ | **$0.6499 \pm 0.020$** | **$0.39957 \pm 0.011$** | $1.42\text{ GB}$ | Highly Robust |
+| **E2: Logistic (Unreg.)** | Multi-seed ($N=3$) | **$369.06 \pm 18.22$** | **$491.9 \pm 37.6$** | $0.3924 \pm 0.133$ | $0.21875 \pm 0.093$ | $1.08\text{ GB}$ | High Seed Variance |
+| **E2: Logistic + $R_1$** | Multi-seed ($N=3$) | $374.54 \pm 12.13$ | $505.2 \pm 26.9$ | $0.4227 \pm 0.150$ | $0.23783 \pm 0.107$ | $1.42\text{ GB}$ | **Optimal Quality/Stability** |
+| **E4: Scaled Critic** | Base channels 128 | $393.78$ | $551.0$ | $0.6450$ | $0.39100$ | $2.28\text{ GB}$ | $+120\%$ latency |
+| **E6: 128×128 (bs=8)** | 128×128 Resolution | — | — | — | — | $1.84\text{ GB}$ | $4.15\text{ GB}$ Headroom |
+| **E6: 128×128 (bs=16)** | 128×128 Resolution | — | — | — | — | $3.41\text{ GB}$ | $2.59\text{ GB}$ Headroom |
+| **E7: Gen. Audit** | Nearest-Neighbor Probe | — | — | Pixel Ratio: $0.9806$ | Feat Ratio: $0.9996$ | — | **No Memorization** |
+
+### 2. Comprehensive Phase 4 Research Reports
+- **[reports/PHASE4_FINAL_REPORT.md](reports/PHASE4_FINAL_REPORT.md)** — **Master Phase 4 Final Research Report**
+- [reports/PHASE4_EMA_ANALYSIS.md](reports/PHASE4_EMA_ANALYSIS.md) — E1 EMA Warmup & Debiasing Optimization
+- [reports/PHASE4_OBJECTIVE_COMPARISON.md](reports/PHASE4_OBJECTIVE_COMPARISON.md) — E2 Multi-Seed Controlled Objective Comparison
+- [reports/PHASE4_ARTIFACT_ANALYSIS.md](reports/PHASE4_ARTIFACT_ANALYSIS.md) — E3 Water-Droplet & 2D FFT Spectral Frequency Decomposition
+- [reports/PHASE4_CAPACITY_ANALYSIS.md](reports/PHASE4_CAPACITY_ANALYSIS.md) — E4 & E5 Architecture Capacity & Resource Scaling
+- [reports/PHASE4_RESOLUTION_ANALYSIS.md](reports/PHASE4_RESOLUTION_ANALYSIS.md) — E6 128×128 Progressive Scaling Feasibility
+- [reports/PHASE4_GENERALIZATION_REPORT.md](reports/PHASE4_GENERALIZATION_REPORT.md) — E7 Generalization, Memorization & Leakage Audit
 
 ---
 

@@ -176,10 +176,20 @@ def main():
     fid_metric = FrechetInceptionDistance(feature=2048, normalize=False).to(device)
     inc = fid_metric.inception.eval()
 
-    with torch.no_grad():
-        fake_feats = inc(to_uint8(fake_imgs)).view(100, -1)
-        train_feats = inc(to_uint8(train_imgs[:500])).view(500, -1)
-        test_feats = inc(to_uint8(test_imgs[:500])).view(500, -1)
+    def extract_inception_features(img_tensor: torch.Tensor, batch_size: int = 32) -> torch.Tensor:
+        feats_list = []
+        with torch.no_grad():
+            for i in range(0, img_tensor.size(0), batch_size):
+                chunk = img_tensor[i : i + batch_size]
+                u_chunk = to_uint8(chunk).to(device)
+                f = inc(u_chunk).view(chunk.size(0), -1)
+                feats_list.append(f.cpu())
+        return torch.cat(feats_list, dim=0)
+
+    print("Extracting Inception features in batches of 32...", flush=True)
+    fake_feats = extract_inception_features(fake_imgs, batch_size=32)
+    train_feats = extract_inception_features(train_imgs[:500], batch_size=32)
+    test_feats = extract_inception_features(test_imgs[:500], batch_size=32)
 
     feat_dist_train = torch.cdist(fake_feats, train_feats, p=2).min(dim=1)[0]
     feat_dist_test = torch.cdist(fake_feats, test_feats, p=2).min(dim=1)[0]
