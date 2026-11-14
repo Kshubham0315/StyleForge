@@ -246,12 +246,12 @@ def run_full_evaluation(
     explorer = LatentExplorer(generator, device=device)
     z1 = torch.randn(1, latent_dim, device=device)
     z2 = torch.randn(1, latent_dim, device=device)
-    interp_strip = explorer.interpolate_slerp(z1, z2, steps=10)
-    interp_strip = (interp_strip * 0.5 + 0.5).clamp(0.0, 1.0)
+    interp_strip = explorer.interpolate_z(z_start=z1, z_end=z2, steps=10, method="slerp")
+    interp_strip = (interp_strip.cpu() * 0.5 + 0.5).clamp(0.0, 1.0)
     vutils.save_image(interp_strip, output_dir / "interpolation_slerp.png", nrow=10)
 
     # (C) StyleForge specific: Truncation sweep and Style mixing
-    if hasattr(generator, "style_dim"):
+    if hasattr(generator, "style_dim") and hasattr(generator, "mapping"):
         trunc_imgs = []
         fixed_z = torch.randn(4, latent_dim, device=device)
         for psi in [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]:
@@ -262,8 +262,8 @@ def run_full_evaluation(
         vutils.save_image(trunc_grid, output_dir / "truncation_sweep.png", nrow=4)
 
         # Style mixing matrix (4x4)
-        style_matrix = explorer.style_mixing_matrix(num_styles_a=4, num_styles_b=4, crossover_layer=3)
-        style_matrix = (style_matrix * 0.5 + 0.5).clamp(0.0, 1.0)
+        style_matrix = explorer.style_mixing_matrix(num_src_a=4, num_src_b=4, mix_mode="coarse")
+        style_matrix = (style_matrix.cpu() * 0.5 + 0.5).clamp(0.0, 1.0)
         vutils.save_image(style_matrix, output_dir / "style_mixing_matrix.png", nrow=5)
 
     # (D) Nearest-Neighbor Memorization Diagnostic

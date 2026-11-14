@@ -1,0 +1,17 @@
+{
+  "model_type": "wgan_baseline",
+  "checkpoint_path": "experiments/phase2_baseline_wgan_gp/checkpoints/checkpoint_final.pt",
+  "dataset": "CelebA Align&Cropped (Photographic)",
+  "resolution": "64x64",
+  "sample_count_real": 614,
+  "sample_count_fake": 614,
+  "fid": 344.9042,
+  "kid_mean": 0.422468,
+  "kid_std": 0.009771,
+  "inception_precision": 0.0,
+  "inception_recall": 0.0,
+  "pairwise_l1_diversity": 0.041,
+  "pairwise_l2_diversity": 5.9067,
+  "batch_pixel_variance": 0.00153,
+  "timestamp": 1794640498.2020907
+}

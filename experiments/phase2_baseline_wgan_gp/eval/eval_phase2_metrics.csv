@@ -1,0 +1,2 @@
+model_type,checkpoint_path,dataset,resolution,sample_count_real,sample_count_fake,fid,kid_mean,kid_std,inception_precision,inception_recall,pairwise_l1_diversity,pairwise_l2_diversity,batch_pixel_variance,timestamp
+wgan_baseline,experiments/phase2_baseline_wgan_gp/checkpoints/checkpoint_final.pt,CelebA Align&Cropped (Photographic),64x64,614,614,344.9042,0.422468,0.009771,0.0,0.0,0.041,5.9067,0.00153,1794640498.2020907
