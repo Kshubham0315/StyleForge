@@ -44,7 +44,7 @@ def to_uint8_images(tensor: torch.Tensor) -> torch.Tensor:
     return (tensor * 255.0).to(torch.uint8)
 
 
-def load_generator_checkpoint(config: dict, ckpt_path: str, device: torch.device) -> nn.Module:
+def load_generator_checkpoint(config: dict, ckpt_path: str, device: torch.device, force_no_ema: bool = False) -> nn.Module:
     m_cfg = config.get("model", {})
     m_type = m_cfg.get("type", "stylegan")
     img_size = m_cfg.get("img_size", 64)
@@ -78,13 +78,13 @@ def load_generator_checkpoint(config: dict, ckpt_path: str, device: torch.device
         )
 
     state = torch.load(ckpt_path, map_location=device, weights_only=False)
-    # Prefer EMA weights if available
-    if "ema_generator" in state:
+    # Prefer EMA weights if available and not forced off
+    if not force_no_ema and "ema_generator" in state:
         generator.load_state_dict(state["ema_generator"])
         print(f"Loaded EMA generator weights from {ckpt_path}")
     elif "generator" in state:
         generator.load_state_dict(state["generator"])
-        print(f"Loaded regular generator weights from {ckpt_path}")
+        print(f"Loaded regular generator weights (no EMA) from {ckpt_path}")
     else:
         generator.load_state_dict(state)
         print(f"Loaded raw generator state_dict from {ckpt_path}")
@@ -99,6 +99,7 @@ def run_full_evaluation(
     output_dir: Path,
     device: torch.device,
     seed: int = 42,
+    force_no_ema: bool = False,
 ) -> Dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     m_cfg = config.get("model", {})
@@ -107,7 +108,7 @@ def run_full_evaluation(
     img_size = m_cfg.get("img_size", 64)
 
     # 1. Load generator
-    generator = load_generator_checkpoint(config, ckpt_path, device)
+    generator = load_generator_checkpoint(config, ckpt_path, device, force_no_ema=force_no_ema)
 
     # 2. Validation DataLoader
     val_loader = get_dataloader(
@@ -145,7 +146,7 @@ def run_full_evaluation(
             feats = inception_net(uint8_b)
             if isinstance(feats, (list, tuple)):
                 feats = feats[0]
-            real_features_list.append(feats.squeeze().cpu())
+            real_features_list.append(feats.view(feats.size(0), -1).cpu())
 
     real_features = torch.cat(real_features_list, dim=0)
     real_images_tensor = torch.cat(real_images_list, dim=0)
@@ -175,7 +176,7 @@ def run_full_evaluation(
             feats = inception_net(uint8_f)
             if isinstance(feats, (list, tuple)):
                 feats = feats[0]
-            fake_features_list.append(feats.squeeze().cpu())
+            fake_features_list.append(feats.view(feats.size(0), -1).cpu())
             count += cur_bs
 
     fake_features = torch.cat(fake_features_list, dim=0)
@@ -305,13 +306,14 @@ def main():
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint .pt")
     parser.add_argument("--output_dir", type=str, required=True, help="Output destination folder")
     parser.add_argument("--seed", type=int, default=42, help="Evaluation random seed")
+    parser.add_argument("--force_no_ema", action="store_true", help="Force evaluating non-EMA raw generator weights")
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    run_full_evaluation(config, args.checkpoint, Path(args.output_dir), device, seed=args.seed)
+    run_full_evaluation(config, args.checkpoint, Path(args.output_dir), device, seed=args.seed, force_no_ema=args.force_no_ema)
 
 
 if __name__ == "__main__":
