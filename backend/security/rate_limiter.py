@@ -19,7 +19,14 @@ class InMemoryRateLimiter:
     def is_allowed(self, client_ip: str) -> tuple[bool, int]:
         now = time.time()
         cutoff = now - self.window_seconds
-        # Clean older timestamps
+
+        # Memory leak defense: opportunistic cleanup when tracking table grows large
+        if len(self.clients) > 1000:
+            stale_keys = [ip for ip, ts in self.clients.items() if not ts or ts[-1] <= cutoff]
+            for ip in stale_keys:
+                del self.clients[ip]
+
+        # Clean older timestamps for this client
         timestamps = [t for t in self.clients[client_ip] if t > cutoff]
         self.clients[client_ip] = timestamps
 

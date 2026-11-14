@@ -72,8 +72,11 @@ class GenerationRepository:
         limit: int = 20,
         offset: int = 0,
         mode: Optional[str] = None,
+        user_id: Optional[int] = None,
     ) -> Tuple[List[Generation], int]:
         query = db.query(Generation)
+        if user_id is not None:
+            query = query.filter(Generation.user_id == user_id)
         if mode:
             query = query.filter(Generation.mode == mode)
         total = query.count()

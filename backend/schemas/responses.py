@@ -72,3 +72,31 @@ class HealthResponse(BaseModel):
     cuda_available: bool
     database_connected: bool
     models_loaded: bool
+
+
+class InterpolateResponse(BaseModel):
+    """Latent manifold traversal response."""
+    interpolation_id: str
+    status: str
+    steps: int
+    space: str
+    seed_a: int
+    seed_b: int
+    latency_ms: float
+    frames: List[ImageItem]
+    created_at: str
+
+
+class StyleMixResponse(BaseModel):
+    """Multi-scale style mixing response."""
+    mix_id: str
+    status: str
+    seed_a: int
+    seed_b: int
+    mix_layers: List[int]
+    latency_ms: float
+    source_a: ImageItem
+    source_b: ImageItem
+    mixed: ImageItem
+    created_at: str
+

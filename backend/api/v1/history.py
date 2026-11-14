@@ -4,9 +4,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from backend.database.models import User
 from backend.database.repository import GenerationRepository
 from backend.database.session import get_db
 from backend.schemas.responses import GenerationListItem, GenerationListResponse
+from backend.security.auth import get_current_user
 from backend.storage import storage_service
 
 router = APIRouter(prefix="", tags=["history"])
@@ -17,10 +19,14 @@ def list_generations(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     mode: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Retrieves paginated history of face generations."""
-    items, total = GenerationRepository.list_generations(db=db, limit=limit, offset=offset, mode=mode)
+    filter_user_id = None if (current_user and current_user.username == "admin") else (current_user.id if current_user else None)
+    items, total = GenerationRepository.list_generations(
+        db=db, limit=limit, offset=offset, mode=mode, user_id=filter_user_id
+    )
 
     out_items = []
     for g in items:

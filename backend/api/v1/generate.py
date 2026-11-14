@@ -24,7 +24,12 @@ from backend.schemas.requests import (
     InterpolateRequest,
     StyleMixRequest,
 )
-from backend.schemas.responses import GenerateResponse, ImageItem
+from backend.schemas.responses import (
+    GenerateResponse,
+    ImageItem,
+    InterpolateResponse,
+    StyleMixResponse,
+)
 from backend.security.auth import get_current_user
 from backend.security.rate_limiter import check_rate_limit
 from backend.storage import storage_service
@@ -193,3 +198,145 @@ async def generate_batch_faces(
         output_format=req.output_format,
     )
     return await generate_faces(gen_req, request=request, current_user=current_user, db=db)
+
+
+@router.post(
+    "/interpolate",
+    response_model=InterpolateResponse,
+    dependencies=[Depends(check_rate_limit)],
+    summary="Continuous latent manifold traversal",
+)
+async def interpolate_faces(
+    req: InterpolateRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generates continuous interpolation between two seed identities."""
+    engine = InferenceEngine.get_instance(checkpoint_path=settings.CHECKPOINT_PATH, device=settings.DEVICE)
+    config = InterpolationConfig(
+        seed_a=req.seed_a,
+        seed_b=req.seed_b,
+        steps=req.steps,
+        space=req.space,
+        truncation_psi=req.truncation_psi,
+        use_ema=req.use_ema,
+        noise_scale=req.noise_scale,
+    )
+
+    interp_id = str(uuid.uuid4())
+
+    async with get_gpu_semaphore():
+        ACTIVE_INFERENCES.inc()
+        try:
+            frames, telemetry = await asyncio.to_thread(engine.interpolate, config)
+        except Exception as e:
+            logger.error("Interpolation failed: %s", e, exc_info=True)
+            REQUEST_COUNT.labels(method="POST", endpoint="/interpolate", status=500).inc()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"code": "INTERPOLATION_FAILED", "message": str(e)},
+            )
+        finally:
+            ACTIVE_INFERENCES.dec()
+
+    REQUEST_COUNT.labels(method="POST", endpoint="/interpolate", status=200).inc()
+
+    image_items: List[ImageItem] = []
+    for idx, pil_img in enumerate(frames):
+        raw_bytes = ImagePostProcessor.pil_to_bytes(pil_img, format="png")
+        filename = f"interp_{interp_id}_{idx}.png"
+        saved_path = storage_service.save_image(raw_bytes, filename, content_type="image/png")
+        b64 = ImagePostProcessor.pil_to_base64(pil_img, format="png")
+        image_items.append(
+            ImageItem(
+                index=idx,
+                base64_data=b64,
+                download_url=f"/api/v1/artifacts/{saved_path}",
+                artifact_path=saved_path,
+            )
+        )
+
+    return InterpolateResponse(
+        interpolation_id=interp_id,
+        status="completed",
+        steps=telemetry["steps"],
+        space=telemetry["space"],
+        seed_a=telemetry["seed_a"],
+        seed_b=telemetry["seed_b"],
+        latency_ms=telemetry["latency_ms"],
+        frames=image_items,
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
+@router.post(
+    "/mix-styles",
+    response_model=StyleMixResponse,
+    dependencies=[Depends(check_rate_limit)],
+    summary="Multi-scale style mixing between identities",
+)
+async def mix_styles_faces(
+    req: StyleMixRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Executes multi-scale style mixing between source and target identities."""
+    engine = InferenceEngine.get_instance(checkpoint_path=settings.CHECKPOINT_PATH, device=settings.DEVICE)
+    config = StyleMixConfig(
+        seed_a=req.seed_a,
+        seed_b=req.seed_b,
+        coarse_from_b=req.coarse_from_b,
+        truncation_psi=req.truncation_psi,
+        use_ema=req.use_ema,
+        noise_scale=req.noise_scale,
+    )
+
+    mix_id = str(uuid.uuid4())
+
+    async with get_gpu_semaphore():
+        ACTIVE_INFERENCES.inc()
+        try:
+            img_a, img_b, img_mixed, telemetry = await asyncio.to_thread(engine.mix_styles, config)
+        except Exception as e:
+            logger.error("Style mixing failed: %s", e, exc_info=True)
+            REQUEST_COUNT.labels(method="POST", endpoint="/mix-styles", status=500).inc()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"code": "STYLE_MIX_FAILED", "message": str(e)},
+            )
+        finally:
+            ACTIVE_INFERENCES.dec()
+
+    REQUEST_COUNT.labels(method="POST", endpoint="/mix-styles", status=200).inc()
+
+    def _package_img(img, label: str, idx: int) -> ImageItem:
+        raw = ImagePostProcessor.pil_to_bytes(img, format="png")
+        fname = f"mix_{mix_id}_{label}.png"
+        saved = storage_service.save_image(raw, fname, content_type="image/png")
+        b64 = ImagePostProcessor.pil_to_base64(img, format="png")
+        return ImageItem(
+            index=idx,
+            base64_data=b64,
+            download_url=f"/api/v1/artifacts/{saved}",
+            artifact_path=saved,
+        )
+
+    item_a = _package_img(img_a, "source_a", 0)
+    item_b = _package_img(img_b, "source_b", 1)
+    item_mixed = _package_img(img_mixed, "mixed", 2)
+
+    return StyleMixResponse(
+        mix_id=mix_id,
+        status="completed",
+        seed_a=telemetry["seed_a"],
+        seed_b=telemetry["seed_b"],
+        mix_layers=[0, 1, 2, 3] if telemetry["coarse_from_b"] else [4, 5, 6, 7],
+        latency_ms=telemetry["latency_ms"],
+        source_a=item_a,
+        source_b=item_b,
+        mixed=item_mixed,
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+

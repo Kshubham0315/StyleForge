@@ -1,6 +1,7 @@
 """Authentication dependency and API key validation."""
 
 import logging
+import secrets
 from typing import Optional
 from fastapi import Depends, Header, HTTPException, Security, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
@@ -45,8 +46,8 @@ def get_current_user(
             },
         )
 
-    # 1. Fast match master key from settings
-    if extracted_key == settings.API_KEY:
+    # 1. Fast match master key from settings (constant-time comparison against timing attacks)
+    if secrets.compare_digest(extracted_key, settings.API_KEY):
         admin_user = db.query(User).filter(User.username == "admin").first()
         if admin_user:
             return admin_user
