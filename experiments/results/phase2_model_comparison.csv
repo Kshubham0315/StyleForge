@@ -2,3 +2,5 @@ experiment_label,sample_count_real,sample_count_fake,fid,kid_mean,kid_std,incept
 Baseline WGAN-GP (1000 steps),614,614,344.9042,0.422468,0.009771,0.0,0.0,0.041,5.9067,0.00153
 "StyleForge AdaIN (EMA, 1000 steps)",614,614,383.7106,0.524562,0.017112,0.0,0.0,0.6512,93.9987,0.370691
 StyleForge AdaIN (Raw / No EMA),614,614,305.987,0.353078,0.01672,0.0,0.0,0.5794,84.4511,0.31068
+Ablation A: Self-Attention (16x16),614,614,404.1891,0.585477,0.013002,0.0,0.0,0.6918,97.8105,0.39405
+Ablation B: Spectral Norm Critic,614,614,417.5093,0.613156,0.021032,0.0,0.0,0.7123,102.3674,0.433389

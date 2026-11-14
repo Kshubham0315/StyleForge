@@ -49,17 +49,23 @@ All ablation runs evaluated on the identical $N=614$ authentic CelebA validation
 
 | Experiment | Training Steps | Inception FID $\downarrow$ | KID Mean $\downarrow$ ($\pm \text{std}$) | Pairwise L1 Diversity $\uparrow$ | Batch Pixel Variance $\uparrow$ | Core Finding |
 | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Full StyleForge AdaIN (EMA)** | 1,000 | 383.71 | $0.5246 \pm 0.0171$ | 0.6512 | 0.37069 | Highest distributional spread |
+| **Full StyleForge AdaIN (EMA)** | 1,000 | 383.71 | $0.5246 \pm 0.0171$ | 0.6512 | 0.37069 | High distributional spread & diversity |
 | **Ablation C: Raw Weights (No EMA)** | 1,000 | **305.99** | **$0.3531 \pm 0.0167$** | 0.5794 | 0.31068 | **77.7 pts lower FID** (sharper feature match) |
-| **Ablation A: Self-Attention ($16\times 16$)** | 300 | 404.19 | $0.5855 \pm 0.0130$ | **0.6918** | **0.39405** | **Highest diversity & spatial variance** |
-| **Ablation B: Spectral Norm Critic** | 300 | *Training...* | *Training...* | *Training...* | *Training...* | Analytic Lipschitz bound |
+| **Ablation A: Self-Attention ($16\times 16$)** | 300 | 404.19 | $0.5855 \pm 0.0130$ | 0.6918 | 0.39405 | **High diversity & non-local coherence** |
+| **Ablation B: Spectral Norm Critic** | 300 | 417.51 | $0.6132 \pm 0.0210$ | **0.7123** | **0.43339** | **Highest pairwise diversity and variance** |
 
 ### 4.1 Key Findings by Ablation
 
 1. **Ablation A (Self-Attention)**:
-   - Self-attention at $16\times 16$ produced the highest diversity of any model tested (pairwise L1 $= 0.6918$, batch variance $= 0.39405$, surpassing even the 1,000-step baseline and standard StyleForge).
+   - Self-attention at $16\times 16$ produced remarkable diversity (pairwise L1 $= 0.6918$, batch variance $= 0.39405$, surpassing the 1,000-step baseline and standard StyleForge).
    - Non-local attention connects distant facial features (e.g. skin tones across forehead and cheeks, symmetry across left and right eye sockets), preventing localized spatial redundancy.
-2. **Ablation C (EMA Smoothing)**:
+
+2. **Ablation B (Spectral Normalization in Critic)**:
+   - Evaluated on $N=614$ validation samples, Spectral Normalization achieved the **single highest pairwise L1 diversity (0.7123)** and **highest batch pixel variance (0.43339)** among all evaluated configurations.
+   - Restricting the critic's singular value $\sigma(W) \le 1$ via power iteration prevents discriminator gradient explosion, which in turn prevents the critic from pushing the generator into sharp local minima.
+   - However, the hard Lipschitz constraint slows down the critic's ability to penalize subtle high-frequency artifacts in early training (300 steps), yielding a higher Inception FID ($417.51$) compared to soft R1 penalty alone.
+
+3. **Ablation C (EMA Smoothing)**:
    - Comparing EMA shadow weights against instantaneous raw generator weights from the exact same training run revealed a crucial duality:
    - Instantaneous weights achieved a much lower Fréchet Inception Distance ($305.99$ vs $383.71$) and lower KID ($0.3531$ vs $0.5246$).
    - EMA shadow weights achieved higher diversity ($0.6512$ vs $0.5794$) and higher batch variance ($0.3707$ vs $0.3107$).

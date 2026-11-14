@@ -37,5 +37,31 @@
     "pairwise_l1_diversity":0.5794,
     "pairwise_l2_diversity":84.4511,
     "batch_pixel_variance":0.31068
+  },
+  {
+    "experiment_label":"Ablation A: Self-Attention (16x16)",
+    "sample_count_real":614,
+    "sample_count_fake":614,
+    "fid":404.1891,
+    "kid_mean":0.585477,
+    "kid_std":0.013002,
+    "inception_precision":0.0,
+    "inception_recall":0.0,
+    "pairwise_l1_diversity":0.6918,
+    "pairwise_l2_diversity":97.8105,
+    "batch_pixel_variance":0.39405
+  },
+  {
+    "experiment_label":"Ablation B: Spectral Norm Critic",
+    "sample_count_real":614,
+    "sample_count_fake":614,
+    "fid":417.5093,
+    "kid_mean":0.613156,
+    "kid_std":0.021032,
+    "inception_precision":0.0,
+    "inception_recall":0.0,
+    "pairwise_l1_diversity":0.7123,
+    "pairwise_l2_diversity":102.3674,
+    "batch_pixel_variance":0.433389
   }
 ]

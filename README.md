@@ -27,17 +27,16 @@ A research-grade StyleGAN-inspired face generation and latent exploration system
 
 All models evaluated on the complete, disjoint CelebA photographic validation partition ($N=614$, $64 \times 64$, normalized to $[-1, 1]$) against an equal number of generated samples under identical evaluation seed ($42$):
 
-| Metric | Baseline WGAN-GP (1000 Steps) | StyleForge AdaIN (EMA, 1000 Steps) | StyleForge AdaIN (Raw / No EMA, 1000 Steps) | Finding / Significance |
-| :--- | :---: | :---: | :---: | :--- |
-| **Model Type** | Convolutional Transpose WGAN | Style-Based + AdaIN | Style-Based + AdaIN | Multi-scale modulation |
-| **Inception-v3 FID $\downarrow$** | 344.90 | 383.71 | **305.99** | Instantaneous weights achieve lowest FID |
-| **KID Mean $\downarrow$** | $0.4225 \pm 0.0098$ | $0.5246 \pm 0.0171$ | **$0.3531 \pm 0.0167$** | Unbiased polynomial MMD estimator |
-| **Pairwise L1 Distance $\uparrow$** | 0.0410 | **0.6512** | 0.5794 | **$15.9\times$ higher diversity in AdaIN** |
-| **Pairwise L2 Distance $\uparrow$** | 5.91 | **94.00** | 84.45 | **$15.9\times$ higher feature spread** |
-| **Batch Pixel Variance $\uparrow$** | 0.00153 | **0.37069** | 0.31068 | **$242\times$ higher variance (No collapse)** |
-| **Dynamic Contrast Range** | Collapsed: `[0, 141]` ($\sigma=29.6$) | **Full: `[0, 255]` ($\sigma=109.8$)** | **Full: `[0, 255]` ($\sigma=109.8$)** | Baseline collapses to gray-brown blur |
-| **Peak Reserved VRAM** | **271 MB** | 3,363 MB | 3,363 MB | Fits safely in 6GB VRAM |
-| **Throughput** | **7.96 it/s** | 2.60 it/s | 2.60 it/s | Real photographic data |
+| Metric | Baseline WGAN-GP | StyleForge AdaIN (EMA) | StyleForge AdaIN (No EMA) | Ablation A (Self-Attn 16x16) | Ablation B (Spectral Norm) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Training Steps** | 1,000 | 1,000 | 1,000 | 300 | 300 |
+| **Inception-v3 FID $\downarrow$** | 344.90 | 383.71 | **305.99** | 404.19 | 417.51 |
+| **KID Mean $\downarrow$** | $0.4225 \pm 0.0098$ | $0.5246 \pm 0.0171$ | **$0.3531 \pm 0.0167$** | $0.5855 \pm 0.0130$ | $0.6132 \pm 0.0210$ |
+| **Pairwise L1 Distance $\uparrow$** | 0.0410 | 0.6512 | 0.5794 | 0.6918 | **0.7123** |
+| **Pairwise L2 Distance $\uparrow$** | 5.91 | 94.00 | 84.45 | 97.81 | **102.37** |
+| **Batch Pixel Variance $\uparrow$** | 0.00153 | 0.37069 | 0.31068 | 0.39405 | **0.43339** |
+| **Dynamic Contrast Range** | Collapsed `[0, 141]` | **Full `[0, 255]`** | **Full `[0, 255]`** | **Full `[0, 255]`** | **Full `[0, 255]`** |
+| **Peak Reserved VRAM** | **271 MB** | 3,363 MB | 3,363 MB | 3,510 MB | 3,486 MB |
 
 Detailed Phase 2 reports, audit logs, and comparative charts:
 - [docs/phase2_audit.md](docs/phase2_audit.md) — Comprehensive dataset and metric audit
