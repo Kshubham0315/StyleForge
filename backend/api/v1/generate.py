@@ -105,6 +105,7 @@ async def generate_faces(
         noise_scale=req.noise_scale,
         use_ema=req.use_ema,
         clamp_adain=req.clamp_adain,
+        enhance=getattr(req, "enhance", False),
         output_format=fmt_enum,
     )
 

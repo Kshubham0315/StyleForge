@@ -221,6 +221,8 @@ __marimo__/
 
 # StyleForge specific
 checkpoints/*.pt
+checkpoints/**/*.onnx
+checkpoints/enhancer/
 experiments/**/checkpoints/*.pt
 experiments/**/samples/*.png
 experiments/**/tb_logs/

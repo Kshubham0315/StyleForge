@@ -18,8 +18,9 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
   const [truncationPsi, setTruncationPsi] = useState<number>(0.8);
   const [seed, setSeed] = useState<number | "">("");
   const [useEma, setUseEma] = useState<boolean>(false);
+  const [enhance, setEnhance] = useState<boolean>(true);
   const [outputFormat, setOutputFormat] = useState<string>("png");
-  const [pixelatedView, setPixelatedView] = useState<boolean>(true);
+  const [pixelatedView, setPixelatedView] = useState<boolean>(false);
 
   // Execution state
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -54,6 +55,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
         noise_scale: noiseScale,
         use_ema: useEma,
         clamp_adain: false,
+        enhance: enhance,
         output_format: outputFormat,
       });
       setResult(res);
@@ -288,6 +290,38 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
             >
               EMA Weights
             </button>
+          </div>
+        </div>
+
+        {/* Neural Face Restoration (Super-Resolution) */}
+        <div>
+          <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
+            Neural Face Restoration
+          </label>
+          <button
+            onClick={() => setEnhance(!enhance)}
+            style={{
+              width: "100%",
+              padding: "0.5rem",
+              borderRadius: "0.375rem",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              background: enhance ? "linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.35))" : "rgba(255,255,255,0.05)",
+              border: enhance ? "1px solid #10b981" : "1px solid var(--border-subtle)",
+              color: enhance ? "#34d399" : "var(--text-muted)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+            }}
+          >
+            <span>{enhance ? "✨ HD Face Restoration: ON (512px)" : "⚡ Native Synthesis: ON (64px)"}</span>
+          </button>
+          <div style={{ fontSize: "0.65rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+            {enhance
+              ? "Neural post-processor restores sharp eyes, lips, skin & geometry."
+              : "Raw 64x64 latent synthesis directly from StyleForge checkpoint."}
           </div>
         </div>
 

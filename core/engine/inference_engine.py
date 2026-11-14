@@ -225,6 +225,10 @@ class InferenceEngine:
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
 
             pil_images = ImagePostProcessor.batch_to_pil(out_tensor)
+            if getattr(config, "enhance", False):
+                from core.engine.enhancer import FaceEnhancer
+                enhancer = FaceEnhancer.get_instance()
+                pil_images = enhancer.enhance_batch(pil_images)
 
             telemetry = {
                 "num_samples": config.num_samples,
@@ -234,12 +238,13 @@ class InferenceEngine:
                 "noise_scale": effective_noise,
                 "use_ema": config.use_ema,
                 "clamp_adain": config.clamp_adain,
+                "enhanced": getattr(config, "enhance", False),
                 "latency_ms": round(elapsed_ms, 2),
                 "latency_per_face_ms": round(elapsed_ms / config.num_samples, 2),
                 "device": str(self.device),
                 "model_name": self.checkpoint_meta.get("model_name", "StyleForge"),
                 "checkpoint_sha256": self.checkpoint_meta.get("sha256"),
-                "resolution": f"{self.checkpoint_meta.get('img_size', 64)}x{self.checkpoint_meta.get('img_size', 64)}",
+                "resolution": "512x512" if getattr(config, "enhance", False) else f"{self.checkpoint_meta.get('img_size', 64)}x{self.checkpoint_meta.get('img_size', 64)}",
             }
 
             return pil_images, telemetry

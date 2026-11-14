@@ -28,6 +28,7 @@ class GenerationConfig(BaseModel):
     noise_scale: float = Field(default=1.0, ge=0.0, le=1.0, description="Per-channel stochastic noise multiplier")
     use_ema: bool = Field(default=False, description="Whether to use Exponential Moving Average generator weights")
     clamp_adain: bool = Field(default=False, description="Experimental AdaIN scale clamping (defaults to False)")
+    enhance: bool = Field(default=False, description="Apply neural face restoration and super-resolution")
     output_format: OutputFormat = Field(default=OutputFormat.PNG, description="Output image encoding format")
 
     @model_validator(mode="after")

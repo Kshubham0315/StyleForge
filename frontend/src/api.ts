@@ -42,6 +42,7 @@ export async function generateFacesApi(payload: {
   noise_scale: number;
   use_ema: boolean;
   clamp_adain: boolean;
+  enhance?: boolean;
   output_format: string;
 }): Promise<GenerateResponse> {
   const res = await fetch(`${API_BASE}/api/v1/generate`, {

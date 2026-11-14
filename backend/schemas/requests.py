@@ -13,6 +13,7 @@ class GenerateRequest(BaseModel):
     noise_scale: float = Field(default=1.0, ge=0.0, le=1.0, description="Per-channel stochastic noise multiplier")
     use_ema: bool = Field(default=False, description="Generate with EMA weights rather than raw weights")
     clamp_adain: bool = Field(default=False, description="Experimental AdaIN scale clamping (defaults to False)")
+    enhance: bool = Field(default=False, description="Apply neural face restoration and super-resolution")
     output_format: str = Field(default="png", description="Image encoding: 'png', 'jpeg', or 'webp'")
 
     @field_validator("mode")
