@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-11-14 (Post-Release Hardening & Hotfix)
+
+### Fixed & Hardened
+- **Gradio Callback Arity Contract:** Fixed callback output unpacking error in `inference/app.py` when `engine is None` by returning 3 values (`None, None, f"Error: {init_error}"`) matching the component signatures.
+- **Air-Gapped / Offline UI Loading:** Optimized Gradio UI construction in `inference/app.py` with system font fallbacks (`["system-ui", "sans-serif"]`) and wrapped Blocks initialization in `build_app()`, preventing module-import network hangs in air-gapped environments.
+- **Inference Parameter Validation:** Added explicit parameter validation in `inference/infer.py` (`num_samples >= 1`, `truncation_psi >= 0.0`, `steps >= 2`, `space in ('W', 'Z')`).
+- **Device Support & CPU Fallback:** Added explicit `device` parameter handling and graceful CPU fallback with user warnings when CUDA is requested but unavailable.
+- **Checkpoint Error Messaging:** Enhanced missing checkpoint error messages with clear export/installation instructions referencing `python scripts/export_final_model.py` and SHA256 integrity checksums.
+- **Scientific Phrasing Guardrails:** Refined documentation and reports across `README.md`, `MODEL_CARD.md`, `docs/STYLEFORGE_TECHNICAL_REPORT.md`, `reports/PHASE5_FINAL_BENCHMARK.md`, and `reports/PHASE5_REPRODUCIBILITY_AUDIT.md` to ensure defensible phrasing regarding memorization, training progression, and environmental reproducibility boundaries.
+
+### Added
+- **Regression Tests:** Expanded test suite in `tests/test_inference.py` to 9 tests covering parameter bounds, checkpoint error messaging, CPU execution, and Gradio callback arity contracts (bringing total test suite to 45/45 passing tests).
+- **Post-Release Audit Report:** Documented comprehensive repository audit findings in `reports/POST_RELEASE_AUDIT.md` and resolution summary in `reports/PHASE6_POST_RELEASE_HOTFIX_REPORT.md`.
+
+---
+
 ## [1.0.0] - 2026-11-14 (Production Open-Source Release)
 
 ### Added

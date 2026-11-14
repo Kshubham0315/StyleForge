@@ -72,134 +72,147 @@ def run_style_mix(seed_a, seed_b, coarse_source, truncation_psi, use_ema):
     msg = f"Style mixing complete. Coarse geometry from {'Seed B' if coarse_from_b else 'Seed A'}."
     return img_a, img_b, img_mixed, msg
 
-# Gradio Theme and Layout (Using system fonts for instant offline/air-gapped loading)
-theme = gr.themes.Soft(
-    primary_hue="blue",
-    secondary_hue="slate",
-    neutral_hue="gray",
-    font=["system-ui", "sans-serif"],
-)
-
-with gr.Blocks(theme=theme, title="StyleForge — Generative AI Studio") as demo:
-    gr.Markdown(
-        """
-        # StyleForge: Style-Based Facial Generation Studio
-        ### High-Stability GAN Synthesis, Latent Space Traversal & Style Mixing
-        *Trained on Authentic Photographic CelebA ($64\\times 64$) with PyTorch & CUDA*
-        """
+def build_app() -> gr.Blocks:
+    """Build and configure the Gradio Blocks interface."""
+    theme = gr.themes.Soft(
+        primary_hue="blue",
+        secondary_hue="slate",
+        neutral_hue="gray",
+        font=["system-ui", "sans-serif"],
     )
 
-    if init_error:
-        gr.Warning(f"Checkpoint initialization warning: {init_error}")
+    with gr.Blocks(theme=theme, title="StyleForge — Generative AI Studio") as demo_blocks:
+        gr.Markdown(
+            """
+            # StyleForge: Style-Based Facial Generation Studio
+            ### High-Stability GAN Synthesis, Latent Space Traversal & Style Mixing
+            *Trained on Authentic Photographic CelebA ($64\\times 64$) with PyTorch & CUDA*
+            """
+        )
 
-    with gr.Tabs():
-        # TAB 1: Face Synthesis
-        with gr.TabItem("Face Synthesis"):
-            with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Markdown("### Generation Parameters")
-                    seed_input = gr.Number(value=42, label="Random Seed", precision=0)
-                    randomize_chk = gr.Checkbox(value=False, label="Randomize Seed Each Time")
-                    num_slider = gr.Slider(minimum=1, maximum=16, value=4, step=1, label="Batch Size (Number of Faces)")
-                    trunc_slider = gr.Slider(minimum=0.0, maximum=1.2, value=0.8, step=0.05, label="Truncation psi (Fidelity vs Variance)")
-                    ema_chk = gr.Checkbox(value=False, label="Use EMA Weights (Smoothed)")
-                    gen_btn = gr.Button("Generate Faces", variant="primary", size="lg")
+        if init_error:
+            gr.Warning(f"Checkpoint initialization warning: {init_error}")
 
-                with gr.Column(scale=2):
-                    gr.Markdown("### Generated Visual Outputs")
-                    gallery_output = gr.Gallery(label="Individual Samples", columns=4, height="auto")
-                    grid_output = gr.Image(label="Composite Grid (Downloadable)", type="pil")
-                    status_text = gr.Textbox(label="Status / Seed Metadata", interactive=False)
+        with gr.Tabs():
+            # TAB 1: Face Synthesis
+            with gr.TabItem("Face Synthesis"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        gr.Markdown("### Generation Parameters")
+                        seed_input = gr.Number(value=42, label="Random Seed", precision=0)
+                        randomize_chk = gr.Checkbox(value=False, label="Randomize Seed Each Time")
+                        num_slider = gr.Slider(minimum=1, maximum=16, value=4, step=1, label="Batch Size (Number of Faces)")
+                        trunc_slider = gr.Slider(minimum=0.0, maximum=1.2, value=0.8, step=0.05, label="Truncation psi (Fidelity vs Variance)")
+                        ema_chk = gr.Checkbox(value=False, label="Use EMA Weights (Smoothed)")
+                        gen_btn = gr.Button("Generate Faces", variant="primary", size="lg")
 
-            gen_btn.click(
-                fn=generate_faces,
-                inputs=[seed_input, num_slider, trunc_slider, ema_chk, randomize_chk],
-                outputs=[gallery_output, grid_output, status_text],
-            )
+                    with gr.Column(scale=2):
+                        gr.Markdown("### Generated Visual Outputs")
+                        gallery_output = gr.Gallery(label="Individual Samples", columns=4, height="auto")
+                        grid_output = gr.Image(label="Composite Grid (Downloadable)", type="pil")
+                        status_text = gr.Textbox(label="Status / Seed Metadata", interactive=False)
 
-        # TAB 2: Latent Interpolation
-        with gr.TabItem("Latent Walk"):
-            with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Markdown("### Interpolation Controls")
-                    interp_seed_a = gr.Number(value=101, label="Source Identity A (Seed)", precision=0)
-                    interp_seed_b = gr.Number(value=202, label="Target Identity B (Seed)", precision=0)
-                    steps_slider = gr.Slider(minimum=4, maximum=16, value=8, step=1, label="Interpolation Frames")
-                    space_radio = gr.Radio(choices=["W", "Z"], value="W", label="Interpolation Space (W=LERP, Z=SLERP)")
-                    interp_trunc = gr.Slider(minimum=0.0, maximum=1.2, value=0.8, step=0.05, label="Truncation psi")
-                    interp_ema = gr.Checkbox(value=False, label="Use EMA Weights")
-                    interp_btn = gr.Button("Run Latent Walk", variant="primary")
+                gen_btn.click(
+                    fn=generate_faces,
+                    inputs=[seed_input, num_slider, trunc_slider, ema_chk, randomize_chk],
+                    outputs=[gallery_output, grid_output, status_text],
+                )
 
-                with gr.Column(scale=2):
-                    gr.Markdown("### Continuous Morphing Sequence")
-                    interp_gallery = gr.Gallery(label="Sequence Frames", columns=8, height="auto")
-                    interp_grid = gr.Image(label="Continuous Filmstrip", type="pil")
-                    interp_status = gr.Textbox(label="Metadata", interactive=False)
+            # TAB 2: Latent Interpolation
+            with gr.TabItem("Latent Traversal"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        gr.Markdown("### Interpolation Endpoints")
+                        interp_seed_a = gr.Number(value=101, label="Start Identity (Seed A)", precision=0)
+                        interp_seed_b = gr.Number(value=202, label="End Identity (Seed B)", precision=0)
+                        interp_steps = gr.Slider(minimum=2, maximum=16, value=8, step=1, label="Transition Steps")
+                        interp_space = gr.Radio(choices=["W", "Z"], value="W", label="Latent Manifold Space")
+                        interp_trunc = gr.Slider(minimum=0.0, maximum=1.2, value=0.8, step=0.05, label="Truncation psi")
+                        interp_ema = gr.Checkbox(value=False, label="Use EMA Weights")
+                        interp_btn = gr.Button("Interpolate Latent Path", variant="primary")
 
-            interp_btn.click(
-                fn=run_interpolation,
-                inputs=[interp_seed_a, interp_seed_b, steps_slider, space_radio, interp_trunc, interp_ema],
-                outputs=[interp_gallery, interp_grid, interp_status],
-            )
+                    with gr.Column(scale=2):
+                        gr.Markdown("### Interpolation Sequence")
+                        interp_gallery = gr.Gallery(label="Interpolation Frames", columns=8, height="auto")
+                        interp_grid = gr.Image(label="Linear Composite Grid", type="pil")
+                        interp_status = gr.Textbox(label="Status", interactive=False)
 
-        # TAB 3: Style Mixing Studio
-        with gr.TabItem("Style Mixing"):
-            with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Markdown("### Style Sources")
-                    mix_seed_a = gr.Number(value=777, label="Identity A (Seed)", precision=0)
-                    mix_seed_b = gr.Number(value=888, label="Identity B (Seed)", precision=0)
-                    mix_mode = gr.Dropdown(
-                        choices=[
-                            "Source B (Coarse Pose) + Source A (Fine Style)",
-                            "Source A (Coarse Pose) + Source B (Fine Style)",
-                        ],
-                        value="Source B (Coarse Pose) + Source A (Fine Style)",
-                        label="Mixing Split Paradigm",
-                    )
-                    mix_trunc = gr.Slider(minimum=0.0, maximum=1.2, value=0.8, step=0.05, label="Truncation psi")
-                    mix_ema = gr.Checkbox(value=False, label="Use EMA Weights")
-                    mix_btn = gr.Button("Mix Styles", variant="primary")
+                interp_btn.click(
+                    fn=run_interpolation,
+                    inputs=[interp_seed_a, interp_seed_b, interp_steps, interp_space, interp_trunc, interp_ema],
+                    outputs=[interp_gallery, interp_grid, interp_status],
+                )
 
-                with gr.Column(scale=2):
-                    gr.Markdown("### Disentanglement Output")
-                    with gr.Row():
-                        out_src_a = gr.Image(label="Source Identity A", type="pil")
-                        out_src_b = gr.Image(label="Source Identity B", type="pil")
-                        out_mixed = gr.Image(label="Synthesized Hybrid Face", type="pil")
-                    mix_status = gr.Textbox(label="Status", interactive=False)
+            # TAB 3: Style Mixing
+            with gr.TabItem("Multi-Scale Style Mixing"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        gr.Markdown("### Style Mixing Inputs")
+                        mix_seed_a = gr.Number(value=42, label="Identity A (Coarse / Base)", precision=0)
+                        mix_seed_b = gr.Number(value=777, label="Identity B (Fine / Style)", precision=0)
+                        mix_mode = gr.Radio(
+                            choices=[
+                                "Source A (Coarse Pose) + Source B (Fine Style)",
+                                "Source B (Coarse Pose) + Source A (Fine Style)",
+                            ],
+                            value="Source A (Coarse Pose) + Source B (Fine Style)",
+                            label="Mixing Configuration",
+                        )
+                        mix_trunc = gr.Slider(minimum=0.0, maximum=1.2, value=0.8, step=0.05, label="Truncation psi")
+                        mix_ema = gr.Checkbox(value=False, label="Use EMA Weights")
+                        mix_btn = gr.Button("Mix Styles", variant="primary")
 
-            mix_btn.click(
-                fn=run_style_mix,
-                inputs=[mix_seed_a, mix_seed_b, mix_mode, mix_trunc, mix_ema],
-                outputs=[out_src_a, out_src_b, out_mixed, mix_status],
-            )
+                    with gr.Column(scale=2):
+                        gr.Markdown("### Disentanglement Output")
+                        with gr.Row():
+                            out_src_a = gr.Image(label="Source Identity A", type="pil")
+                            out_src_b = gr.Image(label="Source Identity B", type="pil")
+                            out_mixed = gr.Image(label="Synthesized Hybrid Face", type="pil")
+                        mix_status = gr.Textbox(label="Status", interactive=False)
 
-        # TAB 4: Architecture & Benchmark
-        with gr.TabItem("Model Card & Benchmarks"):
-            gr.Markdown(
-                """
-                ### StyleForge Production Model Specifications
-                - **Architecture:** Style-Based Generator with 8-layer MLP Mapping Network ($f: \\mathcal{Z} \\to \\mathcal{W}$), learned constant input ($4\\times 4\\times 512$), AdaIN style modulation, and per-channel noise injection.
-                - **Resolution:** $64\\times 64\\times 3$ (RGB)
-                - **Generator Parameters:** $14,535,875$
-                - **Critic Parameters:** $12,174,721$
-                - **Total System Parameters:** $26,710,596$
-                - **Exported Checkpoint Size:** $110.95\\text{ MB}$ (Stripped optimizer momentum buffers)
-                - **License:** MIT License
+                mix_btn.click(
+                    fn=run_style_mix,
+                    inputs=[mix_seed_a, mix_seed_b, mix_mode, mix_trunc, mix_ema],
+                    outputs=[out_src_a, out_src_b, out_mixed, mix_status],
+                )
 
-                ### Reconciled Quantitative Benchmarks (CelebA Validation Split, N=614)
-                | Milestone / Configuration | Global Steps | Inception-v3 FID ↓ | KID Mean ↓ | Pairwise $L_1$ Diversity ↑ | Batch Variance ↑ |
-                |---|:---:|:---:|:---:|:---:|:---:|
-                | **StyleForge Raw (Production)** | **1,500** | **297.76** | **0.3285** | 0.5779 | 0.28987 |
-                | StyleForge EMA (Stabilized) | 1,500 | 336.98 | 0.4167 | 0.6223 | 0.33502 |
-                | StyleForge Intermediate | 1,000 | 305.99 | 0.3531 | 0.5953 | 0.31074 |
-                | StyleForge Logistic + $R_1$ | 300 | 373.66 | 0.4975 | 0.6692 | 0.43134 |
-                | Convolutional WGAN-GP Baseline | 1,000 | 344.90 | 0.4225 | 0.0410 (Collapsed) | 0.00153 (Collapsed) |
+            # TAB 4: Architecture & Benchmark
+            with gr.TabItem("Model Card & Benchmarks"):
+                gr.Markdown(
+                    """
+                    ### StyleForge Production Model Specifications
+                    - **Architecture:** Style-Based Generator with 8-layer MLP Mapping Network ($f: \\mathcal{Z} \\to \\mathcal{W}$), learned constant input ($4\\times 4\\times 512$), AdaIN style modulation, and per-channel noise injection.
+                    - **Resolution:** $64\\times 64\\times 3$ (RGB)
+                    - **Generator Parameters:** $14,535,875$
+                    - **Critic Parameters:** $12,174,721$
+                    - **Total System Parameters:** $26,710,596$
+                    - **Exported Checkpoint Size:** $110.95\\text{ MB}$ (Stripped optimizer momentum buffers)
+                    - **License:** MIT License
 
-                *Evaluated with official TorchMetrics Inception-v3 pool3 ($2048$-dim) feature extractor.*
-                """
-            )
+                    ### Reconciled Quantitative Benchmarks (CelebA Validation Split, N=614)
+                    | Milestone / Configuration | Global Steps | Inception-v3 FID ↓ | KID Mean ↓ | Pairwise $L_1$ Diversity ↑ | Batch Variance ↑ |
+                    |---|:---:|:---:|:---:|:---:|:---:|
+                    | **StyleForge Raw (Production)** | **1,500** | **297.76** | **0.3285** | 0.5779 | 0.28987 |
+                    | StyleForge EMA (Stabilized) | 1,500 | 336.98 | 0.4167 | 0.6223 | 0.33502 |
+                    | StyleForge Intermediate | 1,000 | 305.99 | 0.3531 | 0.5953 | 0.31074 |
+                    | StyleForge Logistic + $R_1$ | 300 | 373.66 | 0.4975 | 0.6692 | 0.43134 |
+                    | Convolutional WGAN-GP Baseline | 1,000 | 344.90 | 0.4225 | 0.0410 (Collapsed) | 0.00153 (Collapsed) |
+
+                    *Evaluated with official TorchMetrics Inception-v3 pool3 ($2048$-dim) feature extractor.*
+                    """
+                )
+
+    return demo_blocks
+
+demo = None
+
+def get_demo() -> gr.Blocks:
+    """Return singleton Gradio Blocks instance."""
+    global demo
+    if demo is None:
+        demo = build_app()
+    return demo
 
 if __name__ == "__main__":
-    demo.launch(server_name="127.0.0.1", server_port=7860, share=False)
+    app_instance = build_app()
+    app_instance.launch(server_name="127.0.0.1", server_port=7860, share=False)
