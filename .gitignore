@@ -220,6 +220,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 # StyleForge specific
+checkpoints/*.pt
 experiments/**/checkpoints/*.pt
 experiments/**/samples/*.png
 experiments/**/tb_logs/

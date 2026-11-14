@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use StyleForge in your research or educational projects, please cite it as below."
+authors:
+  - family-names: "Kumar"
+    given-names: "Shubham"
+    orcid: "https://orcid.org/0009-0000-0000-0000"
+title: "StyleForge: High-Stability Style-Based Generative Adversarial Networks for Photographic Face Synthesis"
+version: 1.0.0
+date-released: 2026-11-14
+url: "https://github.com/Kshubham0315/StyleForge"
+repository-code: "https://github.com/Kshubham0315/StyleForge"
+keywords:
+  - "generative-adversarial-networks"
+  - "stylegan"
+  - "pytorch"
+  - "deep-learning"
+  - "computer-vision"
+  - "face-synthesis"
+  - "fid"
+license: MIT

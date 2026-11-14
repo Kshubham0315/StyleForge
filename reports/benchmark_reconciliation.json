@@ -1,0 +1,46 @@
+[
+  {
+    "fid": 297.756103515625,
+    "kid_mean": 0.3284536302089691,
+    "kid_std": 0.01586250029504299,
+    "l1_diversity": 0.5779447555541992,
+    "batch_variance": 0.28986623883247375,
+    "name": "Phase 3 Step 1500 (Raw Generator)",
+    "steps": 1500,
+    "objective": "WGAN-GP",
+    "weight_type": "Raw"
+  },
+  {
+    "fid": 336.9847106933594,
+    "kid_mean": 0.4166788160800934,
+    "kid_std": 0.015565547160804272,
+    "l1_diversity": 0.6222975850105286,
+    "batch_variance": 0.3350241482257843,
+    "name": "Phase 3 Step 1500 (EMA Generator)",
+    "steps": 1500,
+    "objective": "WGAN-GP",
+    "weight_type": "EMA"
+  },
+  {
+    "fid": 305.98699951171875,
+    "kid_mean": 0.35307756066322327,
+    "kid_std": 0.016719935461878777,
+    "l1_diversity": 0.5953279733657837,
+    "batch_variance": 0.3107350170612335,
+    "name": "Phase 2/3 Step 1000 (Raw Generator)",
+    "steps": 1000,
+    "objective": "WGAN-GP",
+    "weight_type": "Raw"
+  },
+  {
+    "fid": 373.6629638671875,
+    "kid_mean": 0.4975493550300598,
+    "kid_std": 0.01730021834373474,
+    "l1_diversity": 0.6691737771034241,
+    "batch_variance": 0.431341290473938,
+    "name": "Phase 3 Logistic + R1 (Raw Generator)",
+    "steps": 300,
+    "objective": "Logistic + R1",
+    "weight_type": "Raw"
+  }
+]
