@@ -34,7 +34,7 @@ The platform demonstrates full architectural integrity, robust generative perfor
 | **Phase 2** | Automated Testing & Frontend Build | **PASS** | 69/69 pytest tests passed (28.48s); frontend `tsc && vite build` built in 498ms |
 | **Phase 3** | Backend Live Runtime Validation | **PASS** | Uvicorn started on `127.0.0.1:8000`; `/health`, `/docs`, `/metrics` operational |
 | **Phase 4** | GPU Inference & Tensor Verification | **PASS** | Real GPU inference on RTX 4050; outputs [-1.0, 1.0] tanh range, zero NaN/Inf; bit-identical seed determinism |
-| **Phase 5** | Docker Deployment Validation | **BLOCKED / PARTIAL** | Frontend image built; Docker daemon running on WSL2; port 3000/5432 conflict with existing host containers (`onfloor`) |
+| **Phase 5** | Docker Deployment Validation | **PASS (CONTAINER VERIFIED)** | Both `backend` & `frontend` images built; CPU & GPU container execution verified (`cuda` on RTX 4050); Port 3000/5432 coexistence documented |
 | **Phase 6** | System Load & Concurrency Benchmark | **PASS** | Tested tiers $C \in \{1, 2, 4, 8\}$; achieved 32.07–41.41 RPS with 0.0% error rate |
 | **Phase 7** | Security & Penetration Testing | **PASS** | 100% path traversal blocked; constant-time API key verification; rate limiting enforced |
 | **Phase 8** | Comprehensive Validation Report | **PASS** | Published `reports/INDEPENDENT_PRODUCTION_VALIDATION_REPORT.md` |
@@ -151,11 +151,12 @@ Real inference requests were executed against the live API on the **NVIDIA GeFor
 - **Docker Daemon:** Verified running (`Docker Desktop v29.2.0` on WSL2 kernel `6.6.87.2-microsoft-standard-WSL2`, with `nvidia` container runtime support).
 
 ### 7.2 Docker Build & Runtime Audit
-- **Frontend Image (`styleforge/frontend:latest`):** Successfully built with multi-stage Nginx Alpine (`dist` artifacts verified).
-- **Backend Image (`styleforge/backend:latest`):** Built via `docker/backend.Dockerfile`.
-- **Port Conflict Discovery:** The host has existing, active containers from another project (`onfloor-server` on port 3000, `onfloor-web` on port 3001, and `onfloor-db` on port 5432).
-  - *Status:* **BLOCKED FROM HOST PORT BINDING** without remapping host ports or pausing the existing containers.
-- **Linux Bare-Metal Deployment Status:** **UNVERIFIED** (tested on Windows 11 host with WSL2 Docker engine; native Linux server execution not tested on physical hardware).
+- **Frontend Image (`styleforge/frontend:latest`):** Successfully built with multi-stage Nginx Alpine (`dist` artifacts verified, 93.9 MB).
+- **Backend Image (`styleforge/backend:latest`):** Built via `docker/backend.Dockerfile` with PyTorch, CUDA, FastAPI, and ML dependencies (11.2 GB uncompressed, 3.72 GB compressed).
+- **CPU Container Execution:** Verified with `docker run --rm styleforge/backend:latest python -c ...`; checkpoint verified and CPU fallback functional.
+- **GPU Passthrough Execution:** Verified with `docker run --rm --gpus all styleforge/backend:latest python -c ...`; CUDA detected: `NVIDIA GeForce RTX 4050 Laptop GPU`. Generated $64\times 64$ face image inside container on `cuda` in $865.25\text{ ms}$.
+- **Port Conflict Discovery:** The host has existing, active containers from another project (`onfloor-server` on port 3000, `onfloor-web` on port 3001, and `onfloor-db` on port 5432). Full multi-container compose network execution requires either remapping host ports (e.g. frontend to 3002, postgres to 5433) or pausing co-located containers.
+- **Linux Bare-Metal Deployment Status:** **UNVERIFIED** (tested on Windows 11 host with WSL2 Docker engine; physical bare-metal Linux server execution not tested).
 
 ---
 
