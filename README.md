@@ -5,37 +5,47 @@ A research-grade StyleGAN-inspired face generation and latent exploration system
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.5+-ee4c2c.svg)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.1-76b900.svg)](https://developer.nvidia.com/cuda-zone)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests: 24 Passing](https://img.shields.io/badge/Tests-24%2F24%20Passing-brightgreen.svg)](tests/)
+[![Tests: 26 Passing](https://img.shields.io/badge/Tests-26%2F26%20Passing-brightgreen.svg)](tests/)
+[![Phase: 2 Milestone](https://img.shields.io/badge/Phase%202-Authentic%20CelebA%20Benchmark-blueviolet.svg)](docs/)
 
 ---
 
 ## Highlights
 
+- **Authentic Photographic CelebA Benchmark**: Trained and evaluated on 6,140 verified authentic photographic human faces ($178\times 218$) from the aligned & cropped CelebA dataset, with strictly disjoint deterministic Train (4,912), Validation (614), and Test (614) partitions (zero leakage).
 - **Dual Generator Architectures**: Classical convolutional WGAN-GP baseline and full StyleGAN-style generator (8-layer Mapping Network $f: \mathcal{Z} \to \mathcal{W}$ with PixelNorm and equalized learning rate He scaling, learned constant spatial input $4 \times 4 \times 512$, AdaIN blocks, and per-channel stochastic noise injection).
-- **Stabilized Training Pipeline**: Decoupled Two-Sided Gradient Penalty (WGAN-GP) and R1 regularizers, Minibatch Standard Deviation to prevent mode collapse, Exponential Moving Average (EMA) shadow weights, and mixed-precision (FP16 AMP) acceleration with numerical FP32 autograd safeguards.
-- **Architectural Ablations**: Controlled configurations for SAGAN Self-Attention blocks ($16\times 16$) and Spectral Normalization in the Multi-scale Residual Critic.
+- **Contrast Collapse Discovery**: Empirical proof of mode and contrast collapse in the convolutional baseline (pixel range narrows to $[0, 141]$, $\sigma=29.6$, batch variance $0.00153$), whereas StyleForge AdaIN maintains full $[0, 255]$ dynamic range with $242\times$ higher batch variance ($0.37069$).
+- **Stabilized Training Pipeline**: Decoupled Two-Sided Gradient Penalty (WGAN-GP) and R1 regularizers, Minibatch Standard Deviation to prevent mode collapse, Exponential Moving Average (EMA) shadow weights, and calibrated pure FP32 execution preventing gradient underflow.
+- **Architectural Ablations**: Controlled configurations for SAGAN Self-Attention blocks ($16\times 16$), Spectral Normalization in the Multi-scale Residual Critic, and EMA vs Instantaneous weights.
 - **Latent Space Exploration**: Spherical Linear Interpolation (SLERP) in $\mathcal{Z}$-space, Linear Interpolation (LERP) in $\mathcal{W}$-space, multi-scale style mixing across coarse/middle/fine layers, and Truncation Trick ($\psi \in [0.0, 1.0]$).
-- **Quantitative Evaluation Suite**: Pairwise pixel diversity (L1/L2), batch pixel variance (mode collapse diagnostics), manifold precision and recall ($k$-NN manifold approximation), and official TorchMetrics Inception-V3 FID/KID metrics.
-- **Hardware-Optimized**: Calibrated and profiled for consumer GPUs (tested on NVIDIA GeForce RTX 4050 6GB VRAM, using 3.5 GB peak VRAM at $64 \times 64$).
+- **Quantitative Evaluation Suite**: Pairwise pixel diversity (L1/L2), batch pixel variance (mode collapse diagnostics), manifold precision and recall ($k$-NN manifold approximation), and official TorchMetrics Inception-V3 FID/KID metrics evaluated on matched sample sets ($N=614$).
+- **Hardware-Optimized**: Calibrated and profiled for consumer GPUs (tested on NVIDIA GeForce RTX 4050 6GB VRAM, using 3.36 GB peak reserved VRAM at $64 \times 64$).
 
 ---
 
-## Experimental Benchmark: Baseline vs StyleGAN AdaIN (Extended 600 Steps)
+## Phase 2 Experimental Benchmark: Authentic CelebA (1,000 Steps, N=614)
 
-Both models evaluated on real CelebA validation images ($64 \times 64$, normalized to $[-1, 1]$) under identical evaluation seed ($42$):
+All models evaluated on the complete, disjoint CelebA photographic validation partition ($N=614$, $64 \times 64$, normalized to $[-1, 1]$) against an equal number of generated samples under identical evaluation seed ($42$):
 
-| Metric | Baseline WGAN-GP (600 Steps) | StyleForge AdaIN (600 Steps) | StyleForge + Self-Attention (150 Steps) | Finding / Significance |
+| Metric | Baseline WGAN-GP (1000 Steps) | StyleForge AdaIN (EMA, 1000 Steps) | StyleForge AdaIN (Raw / No EMA, 1000 Steps) | Finding / Significance |
 | :--- | :---: | :---: | :---: | :--- |
-| **Model Type** | Convolutional Transpose WGAN | Style-Based + AdaIN | Style-Based + SAGAN | Multi-scale modulation |
-| **Inception-v3 FID $\downarrow$** | **349.15** | 470.89 | **445.12** | Self-attention drops FID by 25.7 pts |
-| **KID Mean $\downarrow$** | **0.50802** ($\pm 0.007$) | 0.70576 ($\pm 0.018$) | 0.66166 ($\pm 0.012$) | Standard Inception-v3 polynomial kernel |
-| **Pairwise L1 Distance** | 0.0415 | **0.6109** | **0.7010** | **$14.7\times$ higher diversity** |
-| **Batch Pixel Variance** | 0.0017 | **0.3519** | **0.3994** | **$207\times$ higher variance (No collapse)** |
-| **Manifold Recall** | 0.0000 | **1.0000** | 0.9600 | Full manifold support coverage |
-| **VRAM Footprint** | 743 MB | 3,475 MB (~3.5 GB) | 3,461 MB (~3.5 GB) | Fits safely in 6GB VRAM |
-| **Throughput** | 5.62 it/s | 1.12 it/s | 1.05 it/s | Baseline is $5\times$ faster |
+| **Model Type** | Convolutional Transpose WGAN | Style-Based + AdaIN | Style-Based + AdaIN | Multi-scale modulation |
+| **Inception-v3 FID $\downarrow$** | 344.90 | 383.71 | **305.99** | Instantaneous weights achieve lowest FID |
+| **KID Mean $\downarrow$** | $0.4225 \pm 0.0098$ | $0.5246 \pm 0.0171$ | **$0.3531 \pm 0.0167$** | Unbiased polynomial MMD estimator |
+| **Pairwise L1 Distance $\uparrow$** | 0.0410 | **0.6512** | 0.5794 | **$15.9\times$ higher diversity in AdaIN** |
+| **Pairwise L2 Distance $\uparrow$** | 5.91 | **94.00** | 84.45 | **$15.9\times$ higher feature spread** |
+| **Batch Pixel Variance $\uparrow$** | 0.00153 | **0.37069** | 0.31068 | **$242\times$ higher variance (No collapse)** |
+| **Dynamic Contrast Range** | Collapsed: `[0, 141]` ($\sigma=29.6$) | **Full: `[0, 255]` ($\sigma=109.8$)** | **Full: `[0, 255]` ($\sigma=109.8$)** | Baseline collapses to gray-brown blur |
+| **Peak Reserved VRAM** | **271 MB** | 3,363 MB | 3,363 MB | Fits safely in 6GB VRAM |
+| **Throughput** | **7.96 it/s** | 2.60 it/s | 2.60 it/s | Real photographic data |
 
-Detailed metrics, logs, and comparative charts can be found in [docs/model_comparison.md](docs/model_comparison.md) and [docs/metrics_analysis.md](docs/metrics_analysis.md).
+Detailed Phase 2 reports, audit logs, and comparative charts:
+- [docs/phase2_audit.md](docs/phase2_audit.md) — Comprehensive dataset and metric audit
+- [docs/scaled_training_results.md](docs/scaled_training_results.md) — 1,000-step training dynamics and convergence
+- [docs/reliable_evaluation.md](docs/reliable_evaluation.md) — Mathematical evaluation of FID, KID, and Precision/Recall
+- [docs/visual_quality_analysis.md](docs/visual_quality_analysis.md) — SLERP, LERP, truncation, and style mixing
+- [docs/ablation_study.md](docs/ablation_study.md) — Controlled ablations (Attention, Spectral Norm, EMA)
+- [docs/phase2_limitations.md](docs/phase2_limitations.md) — Transparent research boundaries and hardware limits
 
 ---
 
