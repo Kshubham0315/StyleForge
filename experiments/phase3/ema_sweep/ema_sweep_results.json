@@ -1,0 +1,46 @@
+[
+  {
+    "variant": "Raw Instantaneous",
+    "fid": 381.6134033203125,
+    "kid_mean": 0.5177820920944214,
+    "kid_std": 0.01614130102097988,
+    "precision": 0.0,
+    "recall": 0.0,
+    "pairwise_l1": 0.6354024410247803,
+    "pairwise_l2": 93.91787719726562,
+    "batch_variance": 0.3688909709453583
+  },
+  {
+    "variant": "EMA decay=0.990",
+    "fid": 393.73175048828125,
+    "kid_mean": 0.5467923879623413,
+    "kid_std": 0.020081892609596252,
+    "precision": 0.0,
+    "recall": 0.0,
+    "pairwise_l1": 0.6605241894721985,
+    "pairwise_l2": 97.12158203125,
+    "batch_variance": 0.39300402998924255
+  },
+  {
+    "variant": "EMA decay=0.995",
+    "fid": 409.50067138671875,
+    "kid_mean": 0.5884756445884705,
+    "kid_std": 0.021932603791356087,
+    "precision": 0.0,
+    "recall": 0.0,
+    "pairwise_l1": 0.6864291429519653,
+    "pairwise_l2": 99.62772369384766,
+    "batch_variance": 0.4121490716934204
+  },
+  {
+    "variant": "EMA decay=0.999",
+    "fid": 419.6001892089844,
+    "kid_mean": 0.618628203868866,
+    "kid_std": 0.018527822569012642,
+    "precision": 0.0,
+    "recall": 0.0,
+    "pairwise_l1": 0.715941309928894,
+    "pairwise_l2": 102.58743286132812,
+    "batch_variance": 0.43518054485321045
+  }
+]
