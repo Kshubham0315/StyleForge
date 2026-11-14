@@ -1,0 +1,41 @@
+[
+  {
+    "experiment_label":"Baseline WGAN-GP (1000 steps)",
+    "sample_count_real":614,
+    "sample_count_fake":614,
+    "fid":344.9042,
+    "kid_mean":0.422468,
+    "kid_std":0.009771,
+    "inception_precision":0.0,
+    "inception_recall":0.0,
+    "pairwise_l1_diversity":0.041,
+    "pairwise_l2_diversity":5.9067,
+    "batch_pixel_variance":0.00153
+  },
+  {
+    "experiment_label":"StyleForge AdaIN (EMA, 1000 steps)",
+    "sample_count_real":614,
+    "sample_count_fake":614,
+    "fid":383.7106,
+    "kid_mean":0.524562,
+    "kid_std":0.017112,
+    "inception_precision":0.0,
+    "inception_recall":0.0,
+    "pairwise_l1_diversity":0.6512,
+    "pairwise_l2_diversity":93.9987,
+    "batch_pixel_variance":0.370691
+  },
+  {
+    "experiment_label":"StyleForge AdaIN (Raw \/ No EMA)",
+    "sample_count_real":614,
+    "sample_count_fake":614,
+    "fid":305.987,
+    "kid_mean":0.353078,
+    "kid_std":0.01672,
+    "inception_precision":0.0,
+    "inception_recall":0.0,
+    "pairwise_l1_diversity":0.5794,
+    "pairwise_l2_diversity":84.4511,
+    "batch_pixel_variance":0.31068
+  }
+]

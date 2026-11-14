@@ -1,0 +1,4 @@
+experiment_label,sample_count_real,sample_count_fake,fid,kid_mean,kid_std,inception_precision,inception_recall,pairwise_l1_diversity,pairwise_l2_diversity,batch_pixel_variance
+Baseline WGAN-GP (1000 steps),614,614,344.9042,0.422468,0.009771,0.0,0.0,0.041,5.9067,0.00153
+"StyleForge AdaIN (EMA, 1000 steps)",614,614,383.7106,0.524562,0.017112,0.0,0.0,0.6512,93.9987,0.370691
+StyleForge AdaIN (Raw / No EMA),614,614,305.987,0.353078,0.01672,0.0,0.0,0.5794,84.4511,0.31068
