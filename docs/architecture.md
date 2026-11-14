@@ -1,90 +1,77 @@
-# StyleForge Architectural Specification
+# StyleForge v2.0 — Production System Architecture
 
-## 1. Overview & Theoretical Framework
+## 1. High-Level Architecture Overview
 
-StyleForge is a research-grade generative adversarial network implementing modern style-based synthesis principles inspired by StyleGAN (Karras et al., 2019) alongside a Wasserstein GAN with Gradient Penalty (WGAN-GP) baseline.
-
-The architecture decouples image synthesis into two distinct spaces:
-1. **Latent Space $\mathcal{Z} \subset \mathbb{R}^{d_z}$**: An unconstrained standard isotropic Gaussian distribution $\mathcal{N}(0, I)$.
-2. **Intermediate Latent Space $\mathcal{W} \subset \mathbb{R}^{d_w}$**: A learned manifold where factors of variation are linearly disentangled.
+StyleForge v2.0 transforms an experimental StyleGAN research project into a multi-tier, production-grade Generative AI platform.
 
 ```
-       z ~ N(0, I)
-            │
-            ▼
-   ┌─────────────────┐
-   │ Mapping Network │  (8-layer MLP, PixelNorm, lr_mul=0.01)
-   └─────────────────┘
-            │
-            ▼  w ∈ W
-  Learned   │
-  Constant  │ (Style Modulation via AdaIN)
-  (4x4x512) ├──────────────► ResBlock 4x4  ──► Noise Injection
-            ├──────────────► ResBlock 8x8  ──► Noise Injection
-            ├──────────────► ResBlock 16x16 ──► [Self-Attention]
-            ├──────────────► ResBlock 32x32 ──► Noise Injection
-            └──────────────► ResBlock 64x64 ──► ToRGB (Tanh) ──► Image [-1, 1]
+                              [ User Web Browser ]
+                                       │
+                                       ▼
+                       [ Nginx Reverse Proxy (Port 80) ]
+                        ├── /api/* ──► [ FastAPI Backend (Port 8000) ]
+                        └── /*      ──► [ React SPA (Port 3000) ]
+                                                │
+                 ┌──────────────────────────────┴──────────────────────────────┐
+                 ▼                                                             ▼
+     [ Security & Ingress ]                                        [ Persistence Tier ]
+     ├── API Key Auth (X-API-Key)                                  ├── PostgreSQL 15 (Metadata & Audit)
+     ├── Sliding Rate Limiter                                      └── Local / S3 Storage (Artifacts)
+     └── Request Context / Tracing                                             │
+                 │                                                             │
+                 ▼                                                             │
+     [ Async GPU Worker Gateway ]                                              │
+     └── Concurrency Semaphore (Bounded VRAM Safety)                          │
+                 │                                                             │
+                 ▼                                                             │
+     [ Modular Inference Engine ]                                              │
+     ├── ModelLoader (Raw & EMA StyleGenerators)                              │
+     ├── CheckpointManager (SHA256 Integrity Verification)                    │
+     ├── Mode Presets (Standard: 1.0, Clean Parity: 0.25)                      │
+     └── ImagePostProcessor ([-1, 1] -> RGB uint8 -> Storage) ─────────────────┘
+                 │
+                 ▼
+     [ Observability & Telemetry ]
+     ├── Prometheus Exporter (/api/v1/metrics)
+     ├── Grafana Dashboard (Port 3001)
+     └── MLflow Run Tracker
 ```
 
 ---
 
-## 2. Mathematical Components
+## 2. Core Subsystems
 
-### 2.1 Mapping Network ($f: \mathcal{Z} \to \mathcal{W}$)
-Given an input vector $z \sim \mathcal{N}(0, I) \in \mathbb{R}^{512}$, we first apply **PixelNorm** across the channel dimension to project it onto a unit hypersphere:
-$$\text{PixelNorm}(z) = \frac{z}{\sqrt{\frac{1}{d_z} \sum_{j=1}^{d_z} z_j^2 + \epsilon}}$$
+### 2.1 Frontend Tier (`frontend/`)
+- **Technology Stack:** React 18, TypeScript 5, Vite, modern CSS design system.
+- **Visual Aesthetic:** Premium dark studio UI, glassmorphic card overlays, responsive layout.
+- **Key Modules:**
+  - `DashboardView`: High-level operational status, quick synthesis launch, recent generation feed.
+  - `GeneratorView`: Full synthesis control center with noise scale sliders, presets (`Standard` vs `Clean Mode`), seed randomizer, truncation $\psi$ modulation, and live side-by-side comparison.
+  - `HistoryView`: Multi-tenant generation audit trail with pagination and artifact retrieval.
+  - `ModelInfoView`: Cryptographic SHA-256 verification card, architecture specifications, empirical benchmarks, and explicit native $64\times 64$ scope callout.
+  - `SystemStatusView`: Hardware telemetry, live GPU VRAM meter, and streaming Prometheus metrics.
 
-The normalized vector passes through an 8-layer fully-connected multi-layer perceptron (MLP). Each linear layer uses **Equalized Learning Rate** with LeakyReLU activation ($\alpha = 0.2$):
-$$w_0 = \text{PixelNorm}(z)$$
-$$w_{l} = \text{LeakyReLU}\left(\hat{W}_l w_{l-1} + \hat{b}_l\right), \quad l \in \{1, \dots, 8\}$$
+### 2.2 Backend REST API (`backend/`)
+- **Framework:** FastAPI with Uvicorn ASGI server and Pydantic validation.
+- **Concurrency & Memory Isolation:** Long-running PyTorch inference is isolated from the asyncio event loop using `asyncio.to_thread` and strictly guarded by an `asyncio.Semaphore` to serialize device execution and guarantee zero VRAM exhaustion.
+- **Security & Middlewares:**
+  - Request ID injection (`X-Request-ID`) and request processing latency timing (`X-Process-Time-Ms`).
+  - Sliding-window in-memory rate limiter enforcing per-IP quotas.
+  - API Key authentication enforcing `X-API-Key` or `Authorization: Bearer <key>` headers.
+  - Defensive path traversal sanitization on all artifact downloads.
 
-#### Equalized Learning Rate & `lr_mul` Scaling
-Rather than initializing weights according to He/Kaiming initialization and optimizing them directly, weights are initialized as:
-$$W_l \sim \mathcal{N}\left(0, \left(\frac{1}{\text{lr\_mul}}\right)^2\right)$$
-During runtime forward propagation, the effective weight is scaled dynamically:
-$$\hat{W}_l = W_l \cdot \left(\frac{\sqrt{2}}{\sqrt{\text{fan\_in}_l}} \cdot \text{lr\_mul}\right)$$
-This ensures:
-1. The forward signal variance is strictly unit-preserved ($\text{Var}(\hat{W}_l x) \approx \text{Var}(x)$), preventing forward signal collapse across deep mapping stacks.
-2. In Adam optimization, where step size is normalized by gradient magnitude ($\Delta W \approx \alpha$), the effective update on $\hat{W}_l$ scales by $\alpha \cdot \text{lr\_mul}$. For the mapping network, $\text{lr\_mul} = 0.01$, stabilizing early latent space divergence.
+### 2.3 Modular Inference Engine (`core/engine/`)
+- **`DeviceManager`:** Automatically detects CUDA capability, manages memory placement, tracks VRAM allocation, and issues safe cache flushes (`empty_cache`).
+- **`CheckpointManager`:** Computes and verifies streaming SHA-256 digests against the official release checkpoint (`ec8e4bf1e4f21f240f7793a1b3922a4510394831d0c39de521c4cd456c9eed64`).
+- **`ModelLoader`:** Loads dual weights (Raw and EMA StyleGenerators) with cleaned module prefixes into evaluation mode (`requires_grad_(False)`).
+- **`InferenceEngine`:** Thread-safe singleton providing deterministic seed generation, W-space truncation modulation, controlled noise injection scaling, continuous latent interpolation (LERP/SLERP), and multi-scale style mixing.
 
----
+### 2.4 Persistence & Storage (`backend/database/` & `backend/storage/`)
+- **Relational Database:** PostgreSQL 15 (with SQLite fallback for local developer velocity). SQLAlchemy ORM models track `User`, `ModelVersion`, `Generation`, and `GenerationMetadata`.
+- **Artifact Storage Abstraction:** Abstract `AbstractStorageService` with `LocalStorageService` implementation. High-resolution raw image bytes are stored on persistent disk volumes and referenced by sanitized relative keys; image binaries are never stored as database BLOBs.
 
-### 2.2 Learned Constant Spatial Input
-Traditional generators (DCGAN, WGAN) feed latent vectors directly into spatial transpose convolutions, forcing the spatial geometry to entangle with global style. StyleForge discards spatial latent inputs in favor of a learned tensor parameter:
-$$C \in \mathbb{R}^{1 \times 512 \times 4 \times 4}, \quad C \sim \mathcal{N}(0, I)$$
-This tensor is broadcast across batch size $N$ and represents the canonical face template, while all identity, lighting, color, and geometric features are modulated externally via AdaIN.
-
----
-
-### 2.3 Adaptive Instance Normalization (AdaIN)
-Each convolutional feature map $x_i \in \mathbb{R}^{B \times C \times H \times W}$ is normalized independently per channel and modulated by a style vector $w \in \mathbb{R}^{d_w}$:
-$$\mu(x)_c = \frac{1}{HW} \sum_{h=1}^H \sum_{w'=1}^W x_{c, h, w'}$$
-$$\sigma(x)_c = \sqrt{\frac{1}{HW} \sum_{h=1}^H \sum_{w'=1}^W (x_{c, h, w'} - \mu(x)_c)^2 + \epsilon}$$
-$$\text{AdaIN}(x, y) = y_{s, c} \left(\frac{x_c - \mu(x)_c}{\sigma(x)_c}\right) + y_{b, c}$$
-where affine style transformation parameters $[y_s, y_b] = \text{EqualizedLinear}(w)$ produce channel-wise scale $y_s$ and bias $y_b$.
-
----
-
-### 2.4 Stochastic Noise Injection
-To model localized stochastic variation (hair texture, freckles, skin pores) without entangling the global style vector, dedicated spatial noise maps $B \in \mathbb{R}^{N \times 1 \times H \times W} \sim \mathcal{N}(0, I)$ are scaled by learnable per-channel scaling factors $P \in \mathbb{R}^{1 \times C \times 1 \times 1}$ and added prior to AdaIN:
-$$x' = x + P \odot B$$
-
----
-
-### 2.5 Minibatch Standard Deviation
-Mode collapse occurs when the critic cannot evaluate diversity across samples within a batch. Minibatch standard deviation computes dispersion statistics across mini-batches:
-1. Divide batch into sub-groups of size $G \le N$.
-2. Compute variance across group samples for every channel and spatial location:
-   $$\sigma_{g, c, h, w} = \sqrt{\frac{1}{G}\sum_{i=1}^G (x_{i, c, h, w} - \mu_{g, c, h, w})^2 + \epsilon}$$
-3. Average across all channels and spatial dimensions to produce a scalar per group:
-   $$S_g = \frac{1}{C \cdot H \cdot W} \sum_{c, h, w} \sigma_{g, c, h, w}$$
-4. Replicate $S_g$ across spatial dimensions $H \times W$ and concatenate as an additional feature channel before the final critic classification block.
-
----
-
-### 2.6 Multi-Scale Residual Critic
-The critic evaluates whether images $x \in [-1, 1]$ are authentic CelebA faces or generated artifacts:
-- Downsampling via strided $3 \times 3$ convolutions and average pooling.
-- Residual skip connections with $1 \times 1$ downsampling projections.
-- Minibatch standard deviation at the penultimate resolution.
-- Final scalar output without sigmoid (unbounded Wasserstein score $\mathbb{R}$).
+### 2.5 Observability & MLOps (`backend/metrics/` & `monitoring/`)
+- **Metrics Exporter:** Prometheus client library exposing `/api/v1/metrics`. Tracks request throughput, latency histograms, GPU memory utilization, and active worker gauges.
+- **Dashboards:** Provisioned Grafana dashboard configured to visualize real-time request rates, P50/P90/P99 latency, and VRAM consumption.
+- **Model Registry & Governance:** `ModelRegistry` catalog tracking checkpoint versions, validation metrics, activation state, and rollback mechanisms.
+- **MLflow Tracker:** `MLflowTracker` module for logging hyperparameters, quantitative metrics (FID, KID, Laplacian variance, PSD ratios), and artifact images.

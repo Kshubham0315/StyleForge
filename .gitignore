@@ -227,3 +227,11 @@ experiments/**/tb_logs/
 outputs/**/*.png
 outputs/*.png
 data/celeba/img_align_celeba/
+
+# StyleForge v2.0 Platform
+data/*.db
+data/artifacts/
+data/mlruns/
+frontend/node_modules/
+frontend/dist/
+*.sqlite3

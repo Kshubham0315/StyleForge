@@ -1,0 +1,135 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: styleforge_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=production
+      - DATABASE_URL=postgresql://styleforge:styleforge_secure_pass@postgres:5432/styleforge
+      - STORAGE_DIR=/app/data/artifacts
+      - API_KEY=styleforge-dev-key-2026
+      - ENABLE_AUTH=true
+      - CHECKPOINT_PATH=checkpoints/styleforge_final_model.pt
+      - MAX_BATCH_SIZE=16
+      - GPU_CONCURRENCY_LIMIT=1
+    volumes:
+      - ./checkpoints:/app/checkpoints:ro
+      - styleforge_artifacts:/app/data/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - styleforge_net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: styleforge_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - styleforge_net
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: styleforge_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=styleforge
+      - POSTGRES_PASSWORD=styleforge_secure_pass
+      - POSTGRES_DB=styleforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U styleforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - styleforge_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: styleforge_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - styleforge_net
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: styleforge_prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - styleforge_net
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: styleforge_grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - styleforge_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: styleforge_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - styleforge_net
+
+networks:
+  styleforge_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  styleforge_artifacts:
