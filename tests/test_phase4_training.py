@@ -11,7 +11,7 @@ import copy
 from training.trainer import GANTrainer, ExponentialMovingAverage
 from training.losses import GANLoss, compute_r1_penalty
 from training.augmentation import AugmentationConfig, build_face_transforms, AdaptiveAugmentationController
-from models.generator import StyleGenerator
+from models.style_generator import StyleGenerator
 from models.critic import StyleCritic
 
 
@@ -128,4 +128,5 @@ def test_safe_checkpoint_serialization_and_resume(dummy_setup):
     assert trainer2.global_step == 100
     assert trainer2.best_metric == 42.5
     # TTUR learning rates correctly overridden
-    assert trainer2.opt_g.param_groups[0]["l
+    assert trainer2.opt_g.param_groups[0]["lr"] == 0.001
+    assert trainer2.opt_d.param_groups[0]["lr"] == 0.002

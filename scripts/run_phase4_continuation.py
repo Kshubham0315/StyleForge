@@ -23,10 +23,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import torch
 from torch.utils.data import DataLoader
 from data.dataset import CelebADataset, FaceTransform
-from models.generator import StyleGenerator
+from models.style_generator import StyleGenerator
 from models.critic import StyleCritic
 from training.trainer import GANTrainer
-from utils.device import get_device
+
 
 
 def parse_args():
@@ -56,7 +56,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    device = get_device()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"=== StyleForge Phase 4 Training Continuation ===")
     print(f"Target Device: {device} ({torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'})")
     print(f"Source Checkpoint: {args.source_ckpt}")
@@ -67,13 +67,20 @@ def main():
 
     # 1. Dataset & Augmented DataLoader
     train_transform = FaceTransform(
-        image_size=64,
-        is_training=True,
+        img_size=64,
         horizontal_flip=True,
+        rotation=True,
         rotation_degrees=5.0,
-        color_jitter=0.10,
+        color_jitter=True,
+        brightness=0.10,
+        contrast=0.05,
     )
-    dataset = CelebADataset(root="data/celeba", split="train", transform=train_transform)
+    dataset = CelebADataset(
+        "data/celeba/img_align_celeba",
+        split="train",
+        rotation=True,
+        color_jitter=True,
+    )
     dataloader = DataLoader(
         dataset,
         batch_size=args.batch_size,
@@ -87,18 +94,18 @@ def main():
     # 2. Architectures
     generator = StyleGenerator(
         latent_dim=512,
-        w_dim=512,
-        num_mapping_layers=4,
-        image_size=64,
+        style_dim=512,
+        num_mapping_layers=8,
+        img_size=64,
         base_channels=512,
         max_channels=512,
     ).to(device)
 
     critic = StyleCritic(
-        image_size=64,
+        img_size=64,
         base_channels=64,
         max_channels=512,
-        mbstd_group_size=4,
+        use_minibatch_std=True,
     ).to(device)
 
     # 3. Training Config
