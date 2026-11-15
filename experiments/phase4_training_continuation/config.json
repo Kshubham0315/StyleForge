@@ -24,7 +24,7 @@
     "amp": true,
     "max_grad_norm": 10.0
   },
-  "git_commit": "e1b8c2cac166e3bf1672800dbcc040575777dbff",
+  "git_commit": "93006954d21616181e87b0e05eba8a3334d04b04",
   "device": "cuda",
   "gpu_name": "NVIDIA GeForce RTX 4050 Laptop GPU"
 }
