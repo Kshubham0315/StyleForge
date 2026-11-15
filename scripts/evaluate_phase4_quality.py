@@ -183,16 +183,15 @@ def main():
     real_mu = np.mean(real_np, axis=0)
     real_sigma = np.cov(real_np, rowvar=False)
 
-    # 3. Candidate Checkpoints
-    ckpt_baseline = "experiments/phase3_convergence/checkpoints/checkpoint_final.pt"
-    ckpt_phase4_latest = "experiments/phase4_training_continuation/checkpoints/checkpoint_latest.pt"
-    ckpt_phase4_best = "experiments/phase4_training_continuation/checkpoints/checkpoint_best.pt"
-
-    eval_targets = [ckpt_baseline]
-    if os.path.exists(ckpt_phase4_best):
-        eval_targets.append(ckpt_phase4_best)
-    elif os.path.exists(ckpt_phase4_latest):
-        eval_targets.append(ckpt_phase4_latest)
+    # 3. Candidate Checkpoints across the training trajectory
+    candidate_list = [
+        "experiments/phase3_convergence/checkpoints/checkpoint_final.pt",
+        "experiments/phase4_training_continuation/checkpoints/checkpoint_step_002000.pt",
+        "experiments/phase4_training_continuation/checkpoints/checkpoint_step_005000.pt",
+        "experiments/phase4_training_continuation/checkpoints/checkpoint_step_008000.pt",
+        "experiments/phase4_training_continuation/checkpoints/checkpoint_step_010000.pt",
+    ]
+    eval_targets = [p for p in candidate_list if os.path.exists(p)]
 
     all_metrics = []
     sample_grids = {}
@@ -219,31 +218,27 @@ def main():
         json.dump(all_metrics, f, indent=2)
     print(f"\n[+] Saved evaluation metrics to {out_json}")
 
-    # If both baseline and improved checkpoint exist, create a comparison visual grid
+    # Multi-checkpoint progression grid
     if len(sample_grids) >= 2:
         steps = sorted(list(sample_grids.keys()))
-        s1, s2 = steps[0], steps[-1]
-        grid1 = sample_grids[s1]  # (16, 3, 64, 64)
-        grid2 = sample_grids[s2]  # (16, 3, 64, 64)
-        
-        # Interleave samples side-by-side: [fake1_stepA, fake1_stepB, fake2_stepA, fake2_stepB, ...]
-        interleaved = []
-        for i in range(min(len(grid1), len(grid2), 8)):
-            interleaved.append(grid1[i:i+1])
-            interleaved.append(grid2[i:i+1])
-        composite = torch.cat(interleaved, dim=0)
+        num_seeds = 4
+        progression_rows = []
+        for seed_idx in range(num_seeds):
+            for s in steps:
+                progression_rows.append(sample_grids[s][seed_idx:seed_idx+1])
+        composite = torch.cat(progression_rows, dim=0)
 
         out_img_path = "reports/visual_audit/phase4_quality_comparison.png"
         os.makedirs("reports/visual_audit", exist_ok=True)
         save_image(
             composite,
             out_img_path,
-            nrow=4,
+            nrow=len(steps),
             normalize=True,
             value_range=(-1, 1),
             padding=4,
         )
-        print(f"[+] Saved visual comparison grid to {out_img_path}")
+        print(f"[+] Saved visual progression grid ({len(steps)} steps x {num_seeds} seeds) to {out_img_path}")
 
 
 if __name__ == "__main__":
