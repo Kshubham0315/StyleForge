@@ -22,7 +22,16 @@ from torchvision import transforms
 class FaceTransform:
     """Prepares face images by cropping to central face region, resizing, and normalizing."""
 
-    def __init__(self, img_size: int = 64, horizontal_flip: bool = True):
+    def __init__(
+        self,
+        img_size: int = 64,
+        horizontal_flip: bool = True,
+        rotation: bool = False,
+        rotation_degrees: float = 5.0,
+        color_jitter: bool = False,
+        brightness: float = 0.1,
+        contrast: float = 0.05,
+    ):
         transforms_list = [
             # Standard CelebA face region crop (140x140 from 178x218)
             transforms.CenterCrop(140),
@@ -30,6 +39,20 @@ class FaceTransform:
         ]
         if horizontal_flip:
             transforms_list.append(transforms.RandomHorizontalFlip(p=0.5))
+        if rotation:
+            transforms_list.append(
+                transforms.RandomRotation(
+                    degrees=(-rotation_degrees, rotation_degrees),
+                    interpolation=transforms.InterpolationMode.BILINEAR,
+                )
+            )
+        if color_jitter:
+            transforms_list.append(
+                transforms.ColorJitter(
+                    brightness=brightness,
+                    contrast=contrast,
+                )
+            )
         transforms_list.extend([
             transforms.ToTensor(),
             # Normalize to [-1, 1] range expected by GAN tanh generator
@@ -59,6 +82,8 @@ class CelebADataset(Dataset):
         seed: int = 42,
         max_samples: Optional[int] = None,
         transform: Optional[Callable] = None,
+        rotation: bool = False,
+        color_jitter: bool = False,
     ):
         self.root_dir = Path(root_dir)
         self.split = split.lower()
@@ -66,6 +91,8 @@ class CelebADataset(Dataset):
         self.transform = transform or FaceTransform(
             img_size=img_size,
             horizontal_flip=(split == "train"),
+            rotation=(split == "train" and rotation),
+            color_jitter=(split == "train" and color_jitter),
         )
 
         if not self.root_dir.exists():
@@ -194,6 +221,8 @@ def get_dataloader(
     use_synthetic: bool = False,
     synthetic_samples: int = 500,
     seed: int = 42,
+    rotation: bool = False,
+    color_jitter: bool = False,
 ) -> DataLoader:
     """Builds and returns an efficient DataLoader for training or evaluation.
 
@@ -213,6 +242,8 @@ def get_dataloader(
             img_size=img_size,
             seed=seed,
             max_samples=max_samples,
+            rotation=rotation,
+            color_jitter=color_jitter,
         )
 
     # Windows-friendly multiprocessing settings

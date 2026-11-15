@@ -193,7 +193,27 @@ class GANTrainer:
         loss_mode = config.get("training", {}).get("loss_mode", "wgan_gp")
         penalty_weight = float(config.get("training", {}).get("penalty_weight", 10.0))
         r1_gamma = float(config.get("training", {}).get("r1_gamma", 10.0))
-        self.loss_fn = GANLoss(mode=loss_mode, penalty_weight=penalty_weight, r1_gamma=r1_gamma)
+        lazy_r1 = bool(config.get("training", {}).get("lazy_r1", False))
+        lazy_interval = int(config.get("training", {}).get("lazy_interval", 16))
+        self.loss_fn = GANLoss(
+            mode=loss_mode,
+            penalty_weight=penalty_weight,
+            r1_gamma=r1_gamma,
+            lazy_r1=lazy_r1,
+            lazy_interval=lazy_interval,
+        )
+        self.critic_step = 0
+
+        # ADA Controller (if configured)
+        self.ada_controller = None
+        if config.get("training", {}).get("use_ada", False):
+            from training.augmentation import AdaptiveAugmentationController
+            batch_size = config.get("training", {}).get("batch_size", 16)
+            self.ada_controller = AdaptiveAugmentationController(
+                target=float(config.get("training", {}).get("ada_target", 0.6)),
+                speed_kimg=int(config.get("training", {}).get("ada_kimg", 10)),
+                batch_size=batch_size,
+            )
 
         # Training parameters
         self.n_critic = int(config.get("training", {}).get("n_critic", 5))
@@ -239,9 +259,10 @@ class GANTrainer:
         self.global_step = 0
         self.history = []
         self.start_time = None
+        self.best_metric = float("inf")
 
     def save_checkpoint(self, filename: str = "checkpoint_latest.pt"):
-        """Save model, EMA, and optimizer states."""
+        """Save model, EMA, optimizer, scaler, and RNG states."""
         ckpt_path = self.checkpoints_dir / filename
         state = {
             "global_step": self.global_step,
@@ -251,6 +272,10 @@ class GANTrainer:
             "ema_metadata": self.ema_generator.get_metadata(),
             "opt_g": self.opt_g.state_dict(),
             "opt_d": self.opt_d.state_dict(),
+            "scaler": self.scaler.state_dict() if self.scaler is not None else None,
+            "rng_cpu": torch.get_rng_state(),
+            "rng_cuda": torch.cuda.get_rng_state(self.device) if (torch.cuda.is_available() and self.device.type == "cuda") else None,
+            "best_metric": self.best_metric,
             "config": self.config,
             "git_commit": get_git_commit_hash(),
             "timestamp": time.time(),
@@ -258,8 +283,18 @@ class GANTrainer:
         torch.save(state, ckpt_path)
         print(f"Checkpoint saved at step {self.global_step}: {ckpt_path}")
 
+    def check_and_save_best(self, metric_value: float, mode: str = "min") -> bool:
+        """Saves checkpoint_best.pt if metric improves."""
+        is_best = (metric_value < self.best_metric) if mode == "min" else (metric_value > self.best_metric)
+        if is_best:
+            self.best_metric = metric_value
+            self.save_checkpoint("checkpoint_best.pt")
+            print(f"[*] New best checkpoint saved at step {self.global_step} (metric: {metric_value:.4f})")
+            return True
+        return False
+
     def load_checkpoint(self, ckpt_path: str):
-        """Restore model, EMA, and optimizer states."""
+        """Restore model, EMA, optimizer, scaler, and RNG states."""
         state = torch.load(ckpt_path, map_location=self.device, weights_only=False)
         self.generator.load_state_dict(state["generator"])
         self.critic.load_state_dict(state["critic"])
@@ -272,6 +307,28 @@ class GANTrainer:
         self.opt_g.load_state_dict(state["opt_g"])
         self.opt_d.load_state_dict(state["opt_d"])
         self.global_step = state["global_step"]
+
+        if "scaler" in state and state["scaler"] is not None and self.scaler is not None:
+            try:
+                self.scaler.load_state_dict(state["scaler"])
+            except Exception as e:
+                print(f"[Warning] Could not restore GradScaler state: {e}")
+
+        if "rng_cpu" in state and state["rng_cpu"] is not None:
+            try:
+                torch.set_rng_state(state["rng_cpu"])
+            except Exception as e:
+                print(f"[Warning] Could not restore CPU RNG state: {e}")
+
+        if "rng_cuda" in state and state["rng_cuda"] is not None and torch.cuda.is_available() and self.device.type == "cuda":
+            try:
+                torch.cuda.set_rng_state(state["rng_cuda"], self.device)
+            except Exception as e:
+                print(f"[Warning] Could not restore CUDA RNG state: {e}")
+
+        if "best_metric" in state and state["best_metric"] is not None:
+            self.best_metric = state["best_metric"]
+
         metrics_file = self.exp_dir / "metrics.json"
         if metrics_file.exists():
             try:

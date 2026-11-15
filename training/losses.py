@@ -96,11 +96,15 @@ class GANLoss(nn.Module):
         mode: str = "wgan_gp",
         penalty_weight: float = 10.0,
         r1_gamma: float = 10.0,
+        lazy_r1: bool = False,
+        lazy_interval: int = 16,
     ):
         super().__init__()
         self.mode = mode.lower()
         self.penalty_weight = penalty_weight
         self.r1_gamma = r1_gamma
+        self.lazy_r1 = lazy_r1
+        self.lazy_interval = max(1, lazy_interval)
 
         valid_modes = ("wgan_gp", "r1", "logistic", "logistic_r1", "wgan_gp_r1")
         if self.mode not in valid_modes:
@@ -111,8 +115,9 @@ class GANLoss(nn.Module):
         critic: nn.Module,
         real_images: torch.Tensor,
         fake_images: torch.Tensor,
+        step: int = 0,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """Compute critic loss and diagnostics."""
+        """Compute critic loss and diagnostics with support for lazy R1 regularization."""
         real_scores = critic(real_images)
         fake_scores = critic(fake_images.detach())
 
@@ -139,18 +144,17 @@ class GANLoss(nn.Module):
             loss_real = F.softplus(-real_scores).mean()
             loss_fake = F.softplus(fake_scores).mean()
             base_loss = loss_real + loss_fake
-            gamma = self.penalty_weight if self.mode != "logistic" else self.penalty_weight
-            if gamma > 0.0 and self.mode in ("r1", "logistic_r1"):
+
+            apply_r1 = True
+            effective_gamma = self.penalty_weight
+            if self.lazy_r1:
+                apply_r1 = (step % self.lazy_interval == 0)
+                # Scale lazy R1 by interval to preserve gradient expectation: (gamma * k / 2)
+                effective_gamma = self.penalty_weight * self.lazy_interval
+
+            if apply_r1 and effective_gamma > 0.0 and self.mode in ("r1", "logistic_r1", "logistic"):
                 r1, grad_norm = compute_r1_penalty(
-                    critic, real_images, r1_gamma=gamma
-                )
-                total_loss = base_loss + r1
-                stats["penalty"] = r1.item()
-                stats["grad_norm"] = grad_norm.item()
-            elif self.mode == "logistic" and self.penalty_weight > 0.0:
-                # If explicit penalty_weight given to logistic mode
-                r1, grad_norm = compute_r1_penalty(
-                    critic, real_images, r1_gamma=self.penalty_weight
+                    critic, real_images, r1_gamma=effective_gamma
                 )
                 total_loss = base_loss + r1
                 stats["penalty"] = r1.item()
