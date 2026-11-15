@@ -1,0 +1,62 @@
+[
+  {
+    "id": "Exp_A",
+    "name": "Baseline Continuation (AMP, WGAN-GP, No Extra Aug)",
+    "steps": 30,
+    "elapsed_sec": 35.78,
+    "sec_per_step": 1.1926,
+    "steps_per_sec": 0.84,
+    "peak_allocated_vram_mb": 1259.8,
+    "peak_reserved_vram_mb": 1516.0,
+    "avg_g_loss": 73.85,
+    "avg_penalty": 18.2413,
+    "avg_critic_grad_norm": 93.6397,
+    "avg_gen_grad_norm": 27.8302,
+    "samples_path": "experiments\\phase4_controlled_pilots\\Exp_A\\samples"
+  },
+  {
+    "id": "Exp_B",
+    "name": "AMP + Data Augmentation (Flip + Rot +-5\u00b0 + Jitter 10%)",
+    "steps": 30,
+    "elapsed_sec": 34.7,
+    "sec_per_step": 1.1567,
+    "steps_per_sec": 0.86,
+    "peak_allocated_vram_mb": 1263.0,
+    "peak_reserved_vram_mb": 1528.0,
+    "avg_g_loss": 72.8438,
+    "avg_penalty": 16.7335,
+    "avg_critic_grad_norm": 88.9284,
+    "avg_gen_grad_norm": 29.5584,
+    "samples_path": "experiments\\phase4_controlled_pilots\\Exp_B\\samples"
+  },
+  {
+    "id": "Exp_C",
+    "name": "AMP + Augmentation + TTUR (lr_G=0.0005, lr_D=0.001)",
+    "steps": 30,
+    "elapsed_sec": 36.26,
+    "sec_per_step": 1.2086,
+    "steps_per_sec": 0.83,
+    "peak_allocated_vram_mb": 1266.3,
+    "peak_reserved_vram_mb": 1530.0,
+    "avg_g_loss": 69.9062,
+    "avg_penalty": 17.1236,
+    "avg_critic_grad_norm": 132.597,
+    "avg_gen_grad_norm": 39.7644,
+    "samples_path": "experiments\\phase4_controlled_pilots\\Exp_C\\samples"
+  },
+  {
+    "id": "Exp_D",
+    "name": "AMP + Augmentation + TTUR + Lazy R1 (Interval=16)",
+    "steps": 30,
+    "elapsed_sec": 21.51,
+    "sec_per_step": 0.7171,
+    "steps_per_sec": 1.39,
+    "peak_allocated_vram_mb": 1270.6,
+    "peak_reserved_vram_mb": 1580.0,
+    "avg_g_loss": 5.9659,
+    "avg_penalty": 0.7995,
+    "avg_critic_grad_norm": 12.4047,
+    "avg_gen_grad_norm": 7.0128,
+    "samples_path": "experiments\\phase4_controlled_pilots\\Exp_D\\samples"
+  }
+]

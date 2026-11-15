@@ -329,6 +329,18 @@ class GANTrainer:
         if "best_metric" in state and state["best_metric"] is not None:
             self.best_metric = state["best_metric"]
 
+        # Override optimizer learning rates if explicitly specified in new training config (e.g. for TTUR)
+        if "lr_g" in self.config.get("training", {}):
+            new_lr_g = float(self.config["training"]["lr_g"])
+            for pg in self.opt_g.param_groups:
+                pg["lr"] = new_lr_g
+            self.lr_g = new_lr_g
+        if "lr_d" in self.config.get("training", {}):
+            new_lr_d = float(self.config["training"]["lr_d"])
+            for pg in self.opt_d.param_groups:
+                pg["lr"] = new_lr_d
+            self.lr_d = new_lr_d
+
         metrics_file = self.exp_dir / "metrics.json"
         if metrics_file.exists():
             try:
@@ -353,19 +365,28 @@ class GANTrainer:
             self.tb_writer.add_images("EMA_Generated_Samples", fake, global_step=step)
 
     def train_step_critic(self, real_images: torch.Tensor) -> Dict[str, float]:
-        """Single training step for critic."""
+        """Single training step for critic with lazy R1 and optional ADA."""
+        self.critic_step += 1
         batch_size = real_images.size(0)
         self.opt_d.zero_grad(set_to_none=True)
 
         z = torch.randn(batch_size, self.latent_dim, device=self.device)
 
-        with torch.amp.autocast("cuda", enabled=self.use_amp):
+        dev_type = "cuda" if self.device.type == "cuda" else "cpu"
+        with torch.amp.autocast(dev_type, enabled=self.use_amp):
             if hasattr(self.generator, "style_dim"):
                 fake_images = self.generator(z, style_mixing_prob=self.style_mixing_prob, update_w_avg=True)
             else:
                 fake_images = self.generator(z)
 
-            loss_d, d_stats = self.loss_fn.critic_loss(self.critic, real_images, fake_images)
+            loss_d, d_stats = self.loss_fn.critic_loss(
+                self.critic, real_images, fake_images, step=self.critic_step
+            )
+
+        # Update ADA controller if present
+        if self.ada_controller is not None:
+            ada_p = self.ada_controller.update(torch.tensor([d_stats.get("real_score_mean", 0.0)]))
+            d_stats["ada_p"] = ada_p
 
         # Gradient anomaly detection
         if torch.isnan(loss_d) or torch.isinf(loss_d):
@@ -392,7 +413,8 @@ class GANTrainer:
 
         z = torch.randn(batch_size, self.latent_dim, device=self.device)
 
-        with torch.amp.autocast("cuda", enabled=self.use_amp):
+        dev_type = "cuda" if self.device.type == "cuda" else "cpu"
+        with torch.amp.autocast(dev_type, enabled=self.use_amp):
             if hasattr(self.generator, "style_dim"):
                 fake_images = self.generator(z, style_mixing_prob=self.style_mixing_prob)
             else:
@@ -508,6 +530,7 @@ class GANTrainer:
             if self.global_step % checkpoint_every == 0:
                 self.save_checkpoint(f"checkpoint_step_{self.global_step:06d}.pt")
                 self.save_checkpoint("checkpoint_latest.pt")
+                self.check_and_save_best(g_stats.get("g_loss", float("inf")), mode="min")
                 with open(self.exp_dir / "metrics.json", "w") as f:
                     json.dump(self.history, f, indent=2)
 

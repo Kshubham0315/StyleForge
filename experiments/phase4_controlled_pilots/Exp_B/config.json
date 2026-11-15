@@ -1,0 +1,29 @@
+{
+  "experiment": {
+    "name": "Exp_B",
+    "exp_dir": "experiments\\phase4_controlled_pilots\\Exp_B",
+    "seed": 42
+  },
+  "training": {
+    "amp": true,
+    "batch_size": 16,
+    "n_critic": 4,
+    "lr_g": 0.0001,
+    "lr_d": 0.0001,
+    "loss_mode": "wgan_gp",
+    "penalty_weight": 10.0,
+    "lazy_r1": false,
+    "lazy_interval": 16,
+    "style_mixing_prob": 0.3,
+    "ema_decay": 0.999,
+    "max_grad_norm": 10.0
+  },
+  "model": {
+    "latent_dim": 512,
+    "style_dim": 512,
+    "img_size": 64
+  },
+  "git_commit": "4913ada19a3fcc094e1ff62328f8508306fc38ba",
+  "device": "cuda",
+  "gpu_name": "NVIDIA GeForce RTX 4050 Laptop GPU"
+}
