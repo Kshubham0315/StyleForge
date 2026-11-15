@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data.dataset import CelebADataset, get_dataloader
+from torch.utils.data import DataLoader
 from models.style_generator import StyleGenerator
 from models.critic import StyleCritic
 from training.losses import GANLoss
@@ -64,7 +65,7 @@ def run_audit():
     # 3. Model Parameters and Shapes
     gen = StyleGenerator(latent_dim=512, style_dim=512, img_size=64, base_channels=512, max_channels=512)
     gen.load_state_dict(state["generator"])
-    critic = StyleCritic(img_size=64, base_channels=512, max_channels=512, use_minibatch_std=True)
+    critic = StyleCritic(img_size=64, base_channels=64, max_channels=512, use_minibatch_std=True)
     critic.load_state_dict(state["critic"])
     
     gen_params = sum(p.numel() for p in gen.parameters())
@@ -92,7 +93,7 @@ def run_audit():
         cfg["experiment"]["exp_dir"] = "experiments/audit_probe"
         cfg["training"]["amp"] = True
         
-        loader = get_dataloader(train_ds, batch_size=16, shuffle=True, num_workers=0)
+        loader = DataLoader(train_ds, batch_size=16, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
         trainer = GANTrainer(gen, critic, loader, cfg, device=device)
         trainer.load_checkpoint(str(ckpt_path))
         
