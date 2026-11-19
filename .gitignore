@@ -237,3 +237,7 @@ data/mlruns/
 frontend/node_modules/
 frontend/dist/
 *.sqlite3
+
+
+
+linkedin_assets/
